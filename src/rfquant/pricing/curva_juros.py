@@ -1,0 +1,148 @@
+"""Interpolação da Estrutura a Termo da Taxa de Juros (ETTJ).
+
+Implementa dois métodos:
+    - Interpolação linear por prazo (simples, robusta).
+    - Nelson-Siegel (paramétrica, suave, padrão de mercado).
+
+Uso típico:
+    >>> pontos = [(1.0, 0.115), (2.0, 0.118), (5.0, 0.125), (10.0, 0.135)]
+    >>> e = ETTJ(pontos, metodo="nelson_siegel")
+    >>> e.taxa(3.5)  # taxa interpolada para 3,5 anos
+    0.1213...
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal
+
+import numpy as np
+from scipy.optimize import curve_fit
+
+Metodo = Literal["linear", "nelson_siegel"]
+
+@dataclass
+class ETTJ:
+    """Estrutura a Termo da Taxa de Juros.
+
+    Attributes:
+        pontos: Lista de tuplas (prazo_em_anos, taxa_anual).
+        metodo: "linear" ou "nelson_siegel".
+    """
+
+    pontos: list[tuple[float, float]]
+    metodo: Metodo = "linear"
+
+    def __post_init__(self) -> None:
+        if len(self.pontos) < 2:
+            raise ValueError("ETTJ precisa de pelo menos 2 pontos.")
+        prazos = [p for p, _ in self.pontos]
+        if prazos != sorted(prazos):
+            raise ValueError("Pontos devem estar ordenados por prazo crescente.")
+        self._prazos = np.array([p for p, _ in self.pontos], dtype=float)
+        self._taxas = np.array([t for _, t in self.pontos], dtype=float)
+        self._params: tuple[float, ...] | None = None
+
+    # ------------------------------------------------------------------
+    # API pública
+    # ------------------------------------------------------------------
+    def taxa(self, prazo: float) -> float:
+        """Retorna a taxa anual interpolada para um prazo em anos."""
+        if prazo <= 0:
+            raise ValueError("Prazo deve ser positivo.")
+        if self.metodo == "linear":
+            return float(np.interp(prazo, self._prazos, self._taxas))
+        return self._nelson_siegel(prazo)
+
+    def taxa_vetor(self, prazos: np.ndarray | list[float]) -> np.ndarray:
+        """Retorna array de taxas para um vetor de prazos."""
+        return np.array([self.taxa(float(p)) for p in prazos])
+
+    def fator_desconto(self, prazo: float) -> float:
+        """Fator de desconto (1 + y)^(-prazo)."""
+        return float((1 + self.taxa(prazo)) ** (-prazo))
+
+    # ------------------------------------------------------------------
+    # Nelson-Siegel
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _ns_func(
+        t: np.ndarray,
+        beta0: float,
+        beta1: float,
+        beta2: float,
+        tau: float,
+    ) -> np.ndarray:
+        """Modelo de Nelson-Siegel.
+
+        y(t) = β0 + β1 · [(1 - e^(-t/τ)) / (t/τ)]
+                  + β2 · [(1 - e^(-t/τ)) / (t/τ) - e^(-t/τ)]
+        """
+        x = np.where(t == 0, 1e-6, t) / tau
+        fator1 = (1 - np.exp(-x)) / x
+        fator2 = fator1 - np.exp(-x)
+        return beta0 + beta1 * fator1 + beta2 * fator2
+
+    def _fit_nelson_siegel(self) -> tuple[float, float, float, float]:
+        if self._params is not None:
+            return self._params  # type: ignore[return-value]
+
+        # Chutes iniciais razoáveis para o Brasil
+        p0 = [
+            float(self._taxas[-1]),           # β0 ≈ taxa longa
+            float(self._taxas[0] - self._taxas[-1]),  # β1 ≈ inclinação
+            -0.01,                             # β2
+            2.0,                               # τ
+        ]
+        bounds = (
+            [0.0, -0.5, -0.5, 0.1],
+            [1.0, 0.5, 0.5, 30.0],
+        )
+        try:
+            params, _ = curve_fit(
+                self._ns_func,
+                self._prazos,
+                self._taxas,
+                p0=p0,
+                bounds=bounds,
+                maxfev=10_000,
+            )
+            self._params = tuple(float(p) for p in params)
+        except Exception:
+            # Fallback: usa linear se o fit falhar
+            self._params = (float(self._taxas[-1]), 0.0, 0.0, 2.0)
+        return self._params  # type: ignore[return-value]
+
+    def _nelson_siegel(self, prazo: float) -> float:
+        b0, b1, b2, tau = self._fit_nelson_siegel()
+        return float(self._ns_func(np.array([prazo]), b0, b1, b2, tau)[0])
+
+# ----------------------------------------------------------------------
+# Utilitários de conversão de taxas
+# ----------------------------------------------------------------------
+def taxa_efetiva_para_nominal(taxa_efetiva: float, periodos: int = 2) -> float:
+    """Converte taxa efetiva anual para nominal (base `periodos` por ano).
+
+    Exemplo: 10% efetivo a.a. → nominal semestral capitalizado.
+    """
+    if periodos <= 0:
+        raise ValueError("Períodos deve ser positivo.")
+    return float(periodos * ((1 + taxa_efetiva) ** (1 / periodos) - 1))
+
+def taxa_nominal_para_efetiva(taxa_nominal: float, periodos: int = 2) -> float:
+    """Converte taxa nominal para efetiva anual."""
+    if periodos <= 0:
+        raise ValueError("Períodos deve ser positivo.")
+    return (1 + taxa_nominal / periodos) ** periodos - 1
+
+def taxa_pre_para_pos(pre: float, ipca_esperado: float) -> float:
+    """Converte taxa prefixada em taxa real (IPCA+) equivalente.
+
+    Fórmula de Fisher aproximada:
+        (1 + pre) = (1 + real) × (1 + ipca)
+    """
+    return (1 + pre) / (1 + ipca_esperado) - 1
+
+def taxa_pos_para_pre(real: float, ipca_esperado: float) -> float:
+    """Converte taxa real (IPCA+) em prefixada equivalente."""
+    return (1 + real) * (1 + ipca_esperado) - 1

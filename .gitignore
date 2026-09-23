@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Segredos / ambiente local
+.env
+
+# Ferramentas de qualidade
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Cache local (se apontado para dentro do repo)
+.cache/
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

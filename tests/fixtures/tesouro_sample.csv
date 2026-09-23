@@ -1,0 +1,6 @@
+nome,tipo,vencimento,taxa_compra,taxa_venda,pu_compra,pu_venda,data_referencia,isento_ir,emissor
+Tesouro Selic 2029,Selic,2029-03-01,0.1150,0.1165,14520.35,14520.10,2026-01-02,False,Tesouro Nacional
+Tesouro Prefixado 2029,Prefixado,2029-01-01,0.1180,0.1200,7850.42,7849.80,2026-01-02,False,Tesouro Nacional
+Tesouro IPCA+ 2035,IPCA+,2035-05-15,0.0620,0.0635,3420.55,3419.20,2026-01-02,False,Tesouro Nacional
+Tesouro IPCA+ 2045,IPCA+,2045-05-15,0.0650,0.0670,2180.10,2178.90,2026-01-02,False,Tesouro Nacional
+Tesouro Prefixado 2027,Prefixado,2027-01-01,0.1120,0.1140,9320.15,9319.50,2026-01-02,False,Tesouro Nacional

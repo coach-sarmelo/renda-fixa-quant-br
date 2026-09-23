@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rfquant"
+version = "0.1.0"
+description = "Análise quantitativa de renda fixa brasileira (Tesouro Direto, CDB, LCI/LCA, debêntures)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "coach-sarmelo" }]
+keywords = ["financas", "renda-fixa", "tesouro-direto", "quant", "brasil"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "requests>=2.31",
+    "python-dateutil>=2.8",
+    "diskcache>=5.6",
+    "typer>=0.12",
+    "rich>=13.7",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+rfq = "rfquant.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/coach-sarmelo/renda-fixa-quant-br"
+Issues = "https://github.com/coach-sarmelo/renda-fixa-quant-br/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501"]
+# Notação matemática intencional em docstrings/strings (×, α, σ) — não homóglifos acidentais
+allowed-confusables = ["×", "α", "σ"]
+
+[tool.mypy]
+# 3.12 (não 3.11): stubs do numpy ≥2.5 usam `type` (PEP 695), que não parseia
+# com python_version=3.11. Runtime continua >=3.11 (requires-python + CI matrix).
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Sem o marker registrado, o skip padrão é retórica (--strict-markers quebra)
+markers = ["network: requer rede real (skip por padrão)"]
+addopts = "-q --cov=rfquant --cov-report=term-missing -m 'not network'"
+
+[tool.coverage.run]
+source = ["src/rfquant"]
+omit = ["*/tests/*", "*/__init__.py"]

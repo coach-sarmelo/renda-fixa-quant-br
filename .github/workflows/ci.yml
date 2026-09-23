@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Segundas 06:00 UTC (03:00 BRT) — roda a suíte network
+    - cron: "0 6 * * 1"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src tests
+
+      - name: Type check (mypy)
+        run: mypy src
+
+      - name: Run tests
+        run: pytest
+
+  # Suíte @pytest.mark.network: só no gatilho semanal — nunca no CI de PR
+  # (rede não é gate de merge; download ~14,5 MB)
+  network:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run network tests
+        run: pytest -m network --no-cov -ra
+
+  # Prova de que o pacote funciona sem nenhuma dependência de LLM.
+  prova-sem-ia:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Prova de ausência real de openai
+        run: python -c "import openai" 2>&1 | grep -q "ModuleNotFoundError"   # prova ausência real
+
+      - name: Gera relatório determinístico offline
+        run: rfq relatorio gerar --output /tmp/r.md
+
+      - name: Disclaimer regulatório presente
+        run: grep -q "Resolução CVM nº 20/2021" /tmp/r.md
+
+      # impede import de openai em qualquer lugar do código (ex.: no
+      # relatorio.py ou no cli.py); sem isto, o contrato fecha por sorte
+      - name: Nenhum import de openai
+        run: "! grep -rn 'import openai' src/rfquant/ --include='*.py'"

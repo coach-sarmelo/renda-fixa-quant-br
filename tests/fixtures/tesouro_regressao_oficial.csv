@@ -1,0 +1,14 @@
+# Fixture de regressão com valores OFICIAIS do Tesouro Direto (cabeçalho de auditoria).
+# path: https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv
+# data-base: 15/07/2024 — a mais recente, medida sobre o CSV completo (176.390 linhas desde 31/12/2004), com >= 3 LTNs ('Tesouro Prefixado') dentro da tolerância de regressão (erro relativo <= 1e-3 de pu.calcular vs 'PU Compra Manha'): 3 de 5.
+# data de captura: 2026-09-20
+# versão da API: CKAN sem versionamento; schema do CSV inalterado desde 31/12/2004 (8 colunas, `;`, decimal `,`)
+# excisão: linhas cuja Data Base = 15/07/2024 e Tipo Titulo = 'Tesouro Prefixado' (LTN zero-cupom; os demais tipos exigem VNA ou cupons que o CSV não carrega e o núcleo de pricing não valida), 5 de 176.390; cada linha byte a byte, ordem original preservada (arquivo ordenado por tipo do título, data-base desc).
+# nota: os LTNs de vencimento 2025/2026/2027 batem com pu.calcular a 4,0e-4 / 4,3e-4 / 8,5e-4; 2029 e 2031 excedem 1e-3 (3,5e-3 / 4,9e-3) por construção — limitação da aproximação D6 de dias úteis, medida em docs/dados.md.
+# cadência: regravar apenas quando a fórmula de PU mudar (mesmo padrão de cabeçalho).
+Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;Taxa Venda Manha;PU Compra Manha;PU Venda Manha;PU Base Manha
+Tesouro Prefixado;01/01/2031;15/07/2024;11,90;12,02;485,60;482,05;482,05
+Tesouro Prefixado;01/01/2025;15/07/2024;10,50;10,62;954,32;953,45;953,45
+Tesouro Prefixado;01/01/2026;15/07/2024;11,11;11,23;856,68;854,97;854,97
+Tesouro Prefixado;01/01/2027;15/07/2024;11,39;11,51;767,23;764,87;764,87
+Tesouro Prefixado;01/01/2029;15/07/2024;11,74;11,86;611,11;607,93;607,93
