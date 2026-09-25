@@ -30,6 +30,7 @@ class ResultadoMarcacao:
     variacao_percentual: float
     dias_uteis_decorridos: int
 
+
 def aproximada(
     pu_compra: float,
     taxa_compra: float,
@@ -43,6 +44,12 @@ def aproximada(
 
     Válida para variações pequenas de taxa (< 1 p.p.).
 
+    Atenção: a aproximação parte de `pu_compra` e ignora o carrego entre a
+    compra e a data atual — portanto só representa o efeito de Δy no
+    instante da compra. Para uma posição em carteira numa data `t`
+    posterior à compra, use `exata`, que re-precifica o fluxo remanescente
+    na data de referência.
+
     Args:
         pu_compra: PU na data da compra.
         taxa_compra: Taxa contratada na compra.
@@ -54,6 +61,7 @@ def aproximada(
     """
     delta_y = taxa_mercado - taxa_compra
     return pu_compra * (1 - duration_mod * delta_y)
+
 
 def exata(
     data_compra: date,
@@ -137,6 +145,7 @@ def exata(
         variacao_percentual=variacao_pct,
         dias_uteis_decorridos=du_decorridos,
     )
+
 
 def curva(
     data_hoje: date,

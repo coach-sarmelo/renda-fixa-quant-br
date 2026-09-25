@@ -42,9 +42,7 @@ def test_listar_fonte_oficial_renderiza_tabela_com_titulos(http_fixture_real) ->
     o corte pós-ordenação (tipo, vencimento) deixaria Selic (último grupo
     alfabético) sempre de fora.
     """
-    resultado = runner.invoke(
-        app, ["tesouro", "listar", "--fonte=oficial", "--limite", "200"]
-    )
+    resultado = runner.invoke(app, ["tesouro", "listar", "--fonte=oficial", "--limite", "200"])
     assert resultado.exit_code == 0
     saida = resultado.stdout
     assert "Tesouro Direto" in saida  # título da tabela
@@ -54,9 +52,7 @@ def test_listar_fonte_oficial_renderiza_tabela_com_titulos(http_fixture_real) ->
 
 def test_listar_com_tipo_filtra_a_tabela(http_fixture_real) -> None:
     """--tipo Selic deixa só Selic: IPCA+/Prefixado não aparecem."""
-    resultado = runner.invoke(
-        app, ["tesouro", "listar", "--fonte=oficial", "--tipo", "Selic"]
-    )
+    resultado = runner.invoke(app, ["tesouro", "listar", "--fonte=oficial", "--tipo", "Selic"])
     assert resultado.exit_code == 0
     saida = resultado.stdout
     assert "Tesouro Selic" in saida
@@ -139,6 +135,20 @@ def test_precificar_data_invalida_erro_ptbr() -> None:
     assert "YYYY-MM-DD" in saida
 
 
+def test_precificar_taxa_percentual_emite_aviso_e_prossegue() -> None:
+    """--taxa 6.2 (cara de percentual) ⇒ aviso amarelo de magnitude, sem
+    bloquear: exit 0, "decimal" na saída e PU renderizado normalmente."""
+    resultado = runner.invoke(
+        app,
+        ["tesouro", "precificar", "--vencimento", "2035-05-15", "--taxa", "6.2"],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "Aviso" in saida
+    assert "decimal" in saida
+    assert "PU:" in saida
+
+
 # ----------------------------------------------------------------------
 # rfq comparar
 # ----------------------------------------------------------------------
@@ -174,9 +184,7 @@ def test_comparar_imprime_tabela_liquida_ordenada() -> None:
     # "Equivalente CDB"): primeira linha = LCI/LCA (isenta lidera), depois CDB
     # e Tesouro
     linhas_dados = [
-        linha
-        for linha in saida.splitlines()
-        if linha.startswith("│") and "Produto" not in linha
+        linha for linha in saida.splitlines() if linha.startswith("│") and "Produto" not in linha
     ]
     assert len(linhas_dados) == 3
     assert "LCI/LCA" in linhas_dados[0]
@@ -184,3 +192,26 @@ def test_comparar_imprime_tabela_liquida_ordenada() -> None:
     assert "Tesouro" in linhas_dados[2]
 
 
+def test_comparar_taxa_decimal_emite_aviso_e_prossegue() -> None:
+    """Taxa em decimal (0.12 onde se espera 12.0) ⇒ aviso amarelo de
+    magnitude, sem bloquear: exit 0, "percentual" na saída e a tabela
+    renderiza ("Taxa bruta" presente)."""
+    resultado = runner.invoke(
+        app,
+        ["comparar", "--cdb", "0.12", "--lci", "0.105", "--prazo", "720"],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "Aviso" in saida
+    assert "percentual" in saida
+    assert "Taxa bruta" in saida
+
+
+def test_comparar_valores_normais_nao_emitem_aviso() -> None:
+    """Valores na convenção esperada (percentual) ⇒ nenhum aviso."""
+    resultado = runner.invoke(
+        app,
+        ["comparar", "--cdb", "12.0", "--lci", "10.5", "--prazo", "720"],
+    )
+    assert resultado.exit_code == 0
+    assert "Aviso" not in resultado.stdout

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,10 +29,16 @@ class Settings(BaseSettings):
     # --- Logging ---
     log_level: str = "INFO"
 
+    @field_validator("cache_dir", "db_path")
+    @classmethod
+    def _expandir_home(cls, value: Path) -> Path:
+        """Expande ``~`` para o home do usuário (ex.: RFQ_CACHE_DIR=~/.rfquant/cache)."""
+        return value.expanduser()
+
     def ensure_dirs(self) -> None:
         """Cria os diretórios necessários, se não existirem."""
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
+
 settings = Settings()
-settings.ensure_dirs()

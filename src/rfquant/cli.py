@@ -38,6 +38,7 @@ relatorio_app = typer.Typer(help="Comandos de relatório.")
 app.add_typer(tesouro_app, name="tesouro")
 app.add_typer(relatorio_app, name="relatorio")
 
+
 # ----------------------------------------------------------------------
 # Top-level
 # ----------------------------------------------------------------------
@@ -45,6 +46,7 @@ app.add_typer(relatorio_app, name="relatorio")
 def version() -> None:
     """Mostra a versão do pacote."""
     console.print(f"rfquant [bold cyan]{__version__}[/]")
+
 
 # ----------------------------------------------------------------------
 # Tesouro Direto
@@ -66,17 +68,19 @@ def _escolher_fonte(fonte: str) -> DataProvider:
             )
             raise typer.Exit(code=1)
         return TesouroDiretoProvider()
-    console.print(
-        f"[red]Fonte '{fonte}' desconhecida.[/] Use --fonte=brapi ou --fonte=oficial."
-    )
+    console.print(f"[red]Fonte '{fonte}' desconhecida.[/] Use --fonte=brapi ou --fonte=oficial.")
     raise typer.Exit(code=1)
 
 
 @tesouro_app.command("listar")
 def tesouro_listar(
-    tipo: Annotated[str | None, typer.Option(help="Filtra por tipo: IPCA+, Prefixado, Selic")] = None,
+    tipo: Annotated[
+        str | None, typer.Option(help="Filtra por tipo: IPCA+, Prefixado, Selic")
+    ] = None,
     limite: Annotated[int, typer.Option(help="Número máximo de resultados")] = 50,
-    fonte: Annotated[str, typer.Option(help="Fonte: brapi (requer BRAPI_TOKEN) | oficial (sem token)")] = "brapi",
+    fonte: Annotated[
+        str, typer.Option(help="Fonte: brapi (requer BRAPI_TOKEN) | oficial (sem token)")
+    ] = "brapi",
 ) -> None:
     """Lista os títulos do Tesouro Direto disponíveis."""
     provider = _escolher_fonte(fonte)
@@ -107,6 +111,7 @@ def tesouro_listar(
         )
     console.print(tabela)
 
+
 @tesouro_app.command("precificar")
 def tesouro_precificar(
     vencimento: Annotated[str, typer.Option(help="Data de vencimento (YYYY-MM-DD)")],
@@ -119,15 +124,30 @@ def tesouro_precificar(
         venc = date.fromisoformat(vencimento)
     except ValueError:
         console.print(
-            f"[red]Data inválida:[/] '{vencimento}'. "
-            "Use o formato YYYY-MM-DD (ex.: 2035-05-15)."
+            f"[red]Data inválida:[/] '{vencimento}'. Use o formato YYYY-MM-DD (ex.: 2035-05-15)."
         )
         raise typer.Exit(code=1) from None
     hoje = date.today()
 
+    # Guarda de magnitude (não-bloqueante): taxa/cupom > 1.0 sugere
+    # percentual (6.2) digitado onde se espera decimal (0.062) — muda a
+    # magnitude 100x. Avisa e prossegue com o valor informado.
+    suspeitos = [
+        f"--{nome} {valor}" for nome, valor in (("taxa", taxa), ("cupom", cupom)) if valor > 1.0
+    ]
+    if suspeitos:
+        console.print(
+            "[yellow]Aviso:[/] este comando espera taxa e cupom em decimal "
+            "(ex.: 0.062 = 6% a.a.); valor(es) aparentemente em percentual: "
+            + ", ".join(suspeitos)
+            + ". Prosseguindo com o valor informado."
+        )
+
     p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
     d_mac = duration.macaulay(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-    d_mod = duration.modificada(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+    d_mod = duration.modificada(
+        hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
+    )
 
     console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
     console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
@@ -136,6 +156,7 @@ def tesouro_precificar(
     if cupom > 0:
         cy = current_yield.calcular(cupom * valor_nominal, p)
         console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
+
 
 # ----------------------------------------------------------------------
 # Comparação
@@ -155,6 +176,22 @@ def comparar(
         produtos.append(taxa_equivalente.ProdutoRF("LCI/LCA", lci / 100, prazo, isento=True))
     if tesouro is not None:
         produtos.append(taxa_equivalente.ProdutoRF("Tesouro", tesouro / 100, prazo, isento=False))
+
+    # Guarda de magnitude (não-bloqueante): taxa < 1.0 sugere decimal
+    # (0.12) digitado onde se espera percentual (12.0) — muda a magnitude
+    # 100x. Avisa e prossegue com o valor informado.
+    suspeitas = [
+        f"--{nome} {valor}"
+        for nome, valor in (("cdb", cdb), ("lci", lci), ("tesouro", tesouro))
+        if valor is not None and valor < 1.0
+    ]
+    if suspeitas:
+        console.print(
+            "[yellow]Aviso:[/] este comando espera taxas em percentual "
+            "(ex.: --cdb 12.0 = 12% a.a.); valor(es) aparentemente em "
+            "decimal: " + ", ".join(suspeitas) + ". Prosseguindo com o "
+            "valor informado."
+        )
 
     if not produtos:
         console.print("[yellow]Informe ao menos um produto.[/]")
@@ -179,6 +216,7 @@ def comparar(
         )
     console.print(tabela)
 
+
 # ----------------------------------------------------------------------
 # Carteira
 # ----------------------------------------------------------------------
@@ -189,7 +227,9 @@ def comparar(
 # ----------------------------------------------------------------------
 @relatorio_app.command("gerar")
 def relatorio_gerar(
-    output: Annotated[Path, typer.Option(help="Caminho do arquivo de saída")] = Path("relatorio.md"),
+    output: Annotated[Path, typer.Option(help="Caminho do arquivo de saída")] = Path(
+        "relatorio.md"
+    ),
     offline: Annotated[bool, typer.Option(help="Gera sem LLM (único caminho disponível)")] = True,
 ) -> None:
     """Gera um relatório de carteira de exemplo (determinístico, sem LLM)."""
@@ -222,6 +262,7 @@ def relatorio_gerar(
     relatorio.salvar(conteudo, str(output))
     console.print(f"[green]Relatório salvo em:[/] {output}")
 
+
 # ----------------------------------------------------------------------
 # Atalho de conveniência
 # ----------------------------------------------------------------------
@@ -234,6 +275,7 @@ def resumo_hoje() -> None:
         tesouro_listar(tipo=None, limite=10, fonte="oficial")
     except Exception as e:
         console.print(f"[red]Erro ao buscar dados:[/] {e}")
+
 
 if __name__ == "__main__":
     app()

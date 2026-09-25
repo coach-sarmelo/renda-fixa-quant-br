@@ -21,6 +21,7 @@ from scipy.optimize import curve_fit
 
 Metodo = Literal["linear", "nelson_siegel"]
 
+
 @dataclass
 class ETTJ:
     """Estrutura a Termo da Taxa de Juros.
@@ -89,10 +90,10 @@ class ETTJ:
 
         # Chutes iniciais razoáveis para o Brasil
         p0 = [
-            float(self._taxas[-1]),           # β0 ≈ taxa longa
+            float(self._taxas[-1]),  # β0 ≈ taxa longa
             float(self._taxas[0] - self._taxas[-1]),  # β1 ≈ inclinação
-            -0.01,                             # β2
-            2.0,                               # τ
+            -0.01,  # β2
+            2.0,  # τ
         ]
         bounds = (
             [0.0, -0.5, -0.5, 0.1],
@@ -109,13 +110,14 @@ class ETTJ:
             )
             self._params = tuple(float(p) for p in params)
         except Exception:
-            # Fallback: usa linear se o fit falhar
+            # Fallback: curva flat na última taxa (β1 = β2 = 0) se o fit falhar
             self._params = (float(self._taxas[-1]), 0.0, 0.0, 2.0)
         return self._params  # type: ignore[return-value]
 
     def _nelson_siegel(self, prazo: float) -> float:
         b0, b1, b2, tau = self._fit_nelson_siegel()
         return float(self._ns_func(np.array([prazo]), b0, b1, b2, tau)[0])
+
 
 # ----------------------------------------------------------------------
 # Utilitários de conversão de taxas
@@ -129,19 +131,22 @@ def taxa_efetiva_para_nominal(taxa_efetiva: float, periodos: int = 2) -> float:
         raise ValueError("Períodos deve ser positivo.")
     return float(periodos * ((1 + taxa_efetiva) ** (1 / periodos) - 1))
 
+
 def taxa_nominal_para_efetiva(taxa_nominal: float, periodos: int = 2) -> float:
     """Converte taxa nominal para efetiva anual."""
     if periodos <= 0:
         raise ValueError("Períodos deve ser positivo.")
     return (1 + taxa_nominal / periodos) ** periodos - 1
 
+
 def taxa_pre_para_pos(pre: float, ipca_esperado: float) -> float:
     """Converte taxa prefixada em taxa real (IPCA+) equivalente.
 
-    Fórmula de Fisher aproximada:
+    Relação de Fisher exata:
         (1 + pre) = (1 + real) × (1 + ipca)
     """
     return (1 + pre) / (1 + ipca_esperado) - 1
+
 
 def taxa_pos_para_pre(real: float, ipca_esperado: float) -> float:
     """Converte taxa real (IPCA+) em prefixada equivalente."""

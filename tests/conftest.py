@@ -22,45 +22,6 @@ def data_ref() -> date:
     """Data de referência fixa para testes determinísticos."""
     return date(2026, 1, 2)
 
-@pytest.fixture
-def vencimento_1a() -> date:
-    """Vencimento daqui a ~1 ano."""
-    return date(2027, 1, 2)
-
-@pytest.fixture
-def vencimento_5a() -> date:
-    """Vencimento daqui a ~5 anos."""
-    return date(2031, 1, 2)
-
-@pytest.fixture
-def tesouro_ipca_2035() -> dict:
-    """Título de exemplo: Tesouro IPCA+ 2035."""
-    return {
-        "nome": "Tesouro IPCA+ 2035",
-        "tipo": "IPCA+",
-        "data_compra": date(2026, 1, 2),
-        "data_vencimento": date(2035, 5, 15),
-        "valor_nominal": 1000.0,
-        "taxa_anual": 0.062,
-        "taxa_cupom_anual": 0.06,
-        "frequencia_cupom": 2,
-    }
-
-@pytest.fixture
-def tesouro_prefixado_2029() -> dict:
-    """Título de exemplo: Tesouro Prefixado 2029 (zero-cupom)."""
-    return {
-        "nome": "Tesouro Prefixado 2029",
-        "tipo": "Prefixado",
-        "data_compra": date(2026, 1, 2),
-        "data_vencimento": date(2029, 1, 1),
-        "valor_nominal": 1000.0,
-        "taxa_anual": 0.115,
-        "taxa_cupom_anual": 0.0,
-        "frequencia_cupom": 2,
-    }
-
-
 
 # ----------------------------------------------------------------------
 # Padrões de mock/isolamento (replicar em testes novos)

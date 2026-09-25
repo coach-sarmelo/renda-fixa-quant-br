@@ -34,6 +34,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check src tests
 
+      - name: Format (ruff)
+        run: ruff format --check src tests
+
       - name: Type check (mypy)
         run: mypy src
 
@@ -41,7 +44,9 @@ jobs:
         run: pytest
 
   # Suíte @pytest.mark.network: só no gatilho semanal — nunca no CI de PR
-  # (rede não é gate de merge; download ~14,5 MB)
+  # (rede não é gate de merge; o `if` do job é quem isola o PR). Cobertura
+  # §13.7: Tesouro Oficial (~14,5 MB — docs/dados.md:15), CVM informe diário
+  # (~11 MB — sonda §7.4/S1) e SGS série 12 (JSON pequeno, sem auth).
   network:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest

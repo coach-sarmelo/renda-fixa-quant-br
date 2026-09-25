@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.26",
     "pandas>=2.1",
+    "pandas-market-calendars>=5.0",
     "scipy>=1.11",
     "pydantic>=2.5",
     "pydantic-settings>=2.1",
@@ -38,7 +39,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
-    "ruff>=0.4",
+    "ruff==0.16.8",
     "mypy>=1.10",
     "pre-commit>=3.7",
 ]
@@ -72,9 +73,12 @@ warn_unused_configs = true
 ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Sem o marker registrado, o skip padrão é retórica (--strict-markers quebra)
+# Marker único da suíte (network) registrado ⇒ --strict-markers ativo nos
+# addopts é seguro: marker grafado errado num teste novo falha NA COLETA
+# (AC-CAP6-02/T32 — "strict=True" do plano), não vaza silencioso para a
+# suíte padrão nem escapa do -m network do job semanal (§13.7).
 markers = ["network: requer rede real (skip por padrão)"]
-addopts = "-q --cov=rfquant --cov-report=term-missing -m 'not network'"
+addopts = "-q --cov=rfquant --cov-report=term-missing --strict-markers -m 'not network'"
 
 [tool.coverage.run]
 source = ["src/rfquant"]
