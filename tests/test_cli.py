@@ -112,6 +112,33 @@ def test_precificar_zero_cupom_nao_mostra_current_yield() -> None:
     assert "Current Yield" not in saida
 
 
+def test_precificar_data_invalida_erro_ptbr() -> None:
+    """Data fora do ISO (15/05/2035 — formato dia/mês/ano que um
+    brasileiro digitaria) ⇒ erro pt-BR + exit 1, sem traceback cru; a
+    mensagem repete o valor digitado e sugere o formato YYYY-MM-DD."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "15/05/2035",
+            "--taxa",
+            "0.062",
+            "--cupom",
+            "0.06",
+        ],
+    )
+    assert resultado.exit_code == 1
+    # saída controlada (typer.Exit vira SystemExit no runner), não a
+    # ValueError crua que motivou este teste
+    assert isinstance(resultado.exception, SystemExit)
+    saida = resultado.stdout
+    assert "Data inválida" in saida
+    assert "15/05/2035" in saida
+    assert "YYYY-MM-DD" in saida
+
+
 # ----------------------------------------------------------------------
 # rfq comparar
 # ----------------------------------------------------------------------
@@ -155,3 +182,5 @@ def test_comparar_imprime_tabela_liquida_ordenada() -> None:
     assert "LCI/LCA" in linhas_dados[0]
     assert "CDB" in linhas_dados[1]
     assert "Tesouro" in linhas_dados[2]
+
+

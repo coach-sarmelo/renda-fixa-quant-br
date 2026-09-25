@@ -115,7 +115,14 @@ def tesouro_precificar(
     cupom: Annotated[float, typer.Option(help="Cupom anual (0 = zero-cupom)")] = 0.0,
 ) -> None:
     """Precifica um título genérico de renda fixa."""
-    venc = date.fromisoformat(vencimento)
+    try:
+        venc = date.fromisoformat(vencimento)
+    except ValueError:
+        console.print(
+            f"[red]Data inválida:[/] '{vencimento}'. "
+            "Use o formato YYYY-MM-DD (ex.: 2035-05-15)."
+        )
+        raise typer.Exit(code=1) from None
     hoje = date.today()
 
     p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
@@ -175,6 +182,7 @@ def comparar(
 # ----------------------------------------------------------------------
 # Carteira
 # ----------------------------------------------------------------------
+
 
 # ----------------------------------------------------------------------
 # Relatório
