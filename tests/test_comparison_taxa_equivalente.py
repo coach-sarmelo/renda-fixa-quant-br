@@ -16,9 +16,11 @@ def test_cdi_para_taxa_anual_valor_do_ac() -> None:
     # 0,143 (0,14300000000000002), então o "exato" do AC usa tolerância apertada.
     assert taxa_equivalente.cdi_para_taxa_anual(1.10, 0.13) == pytest.approx(0.143, abs=1e-15)
 
+
 def test_taxa_anual_para_cdi_inverso() -> None:
     """Inverso do AC: 14,3% a.a. com CDI 13% -> 110% do CDI (conta à mão: 0,143 / 0,13 = 1,10)."""
     assert taxa_equivalente.taxa_anual_para_cdi(0.143, 0.13) == pytest.approx(1.10, rel=1e-12)
+
 
 @pytest.mark.parametrize(
     ("percentual", "cdi"),
@@ -50,6 +52,7 @@ def test_gross_up_roundtrip_por_faixa(prazo: int) -> None:
     volta = taxa_equivalente.tributado_equivalente_a_isento(bruto_eq, prazo)
     assert volta == pytest.approx(taxa_isento, rel=1e-12)
 
+
 def test_gross_up_caso_a_mao_faixa_15() -> None:
     """Caso à mão: LCI 10% a.a. com prazo > 720 d (IR 15%) -> CDB bruto = 10 / 0,85 = 11,7647% a.a."""
     bruto_eq = taxa_equivalente.isento_equivalente_a_tributado(0.10, 900)
@@ -66,6 +69,7 @@ def test_fisher_caso_a_mao() -> None:
     # 1,12 / 1,04 = 1,0769230769... -> 0,07692307692307693
     assert real == pytest.approx(0.07692307692307693, rel=1e-12)
 
+
 @pytest.mark.parametrize(
     ("prefixado", "ipca"),
     [
@@ -78,6 +82,7 @@ def test_fisher_ida_e_volta_pre_real_pre(prefixado: float, ipca: float) -> None:
     """Pre -> real -> pre recupera a taxa original (rel 1e-12)."""
     real = taxa_equivalente.pre_para_ipca_mais(prefixado, ipca)
     assert taxa_equivalente.ipca_mais_para_pre(real, ipca) == pytest.approx(prefixado, rel=1e-12)
+
 
 @pytest.mark.parametrize(
     ("real", "ipca"),
@@ -135,12 +140,9 @@ def test_comparar_ordenacao_e_equivalente_cdb() -> None:
                 rel=1e-12,
             )
             # reversibilidade: o CDB equivalente volta ao líquido do isento
-            assert (
-                taxa_equivalente.tributado_equivalente_a_isento(
-                    r.equivalente_cdb, r.produto.prazo_dias
-                )
-                == pytest.approx(r.taxa_liquida_anual, rel=1e-12)
-            )
+            assert taxa_equivalente.tributado_equivalente_a_isento(
+                r.equivalente_cdb, r.produto.prazo_dias
+            ) == pytest.approx(r.taxa_liquida_anual, rel=1e-12)
         else:
             # tributado: equivalente_cdb é a própria taxa bruta
             assert r.equivalente_cdb == r.produto.taxa_anual
@@ -155,6 +157,7 @@ def test_taxa_liquida_anual_linear_isento_e_tributado() -> None:
     lci = taxa_equivalente.ProdutoRF("LCI 12%", 0.12, 900, isento=True)
     assert taxa_equivalente.taxa_liquida_anual(cdb) == pytest.approx(0.102, rel=1e-12)
     assert taxa_equivalente.taxa_liquida_anual(lci) == pytest.approx(0.12, rel=1e-12)
+
 
 def test_docstring_taxa_liquida_anual_cita_convencao_linear_e_aproximacao() -> None:
     """Docstring cita a convenção linear, a aproximação para prazo != 1 ano

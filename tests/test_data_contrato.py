@@ -45,13 +45,9 @@ def validar_df_titulos(df: pd.DataFrame) -> None:
         assert isinstance(t["nome"], str) and t["nome"], f"nome vazio: {t['nome']!r}"
         assert t["tipo"] in TIPOS_VALIDOS, f"tipo inválido: {t['tipo']!r}"
         assert isinstance(t["vencimento"], date), f"vencimento: {t['vencimento']!r}"
-        assert isinstance(t["data_referencia"], date), (
-            f"data_referencia: {t['data_referencia']!r}"
-        )
+        assert isinstance(t["data_referencia"], date), f"data_referencia: {t['data_referencia']!r}"
         assert isinstance(t["isento_ir"], bool), f"isento_ir: {t['isento_ir']!r}"
-        assert isinstance(t["emissor"], str) and t["emissor"], (
-            f"emissor vazio: {t['emissor']!r}"
-        )
+        assert isinstance(t["emissor"], str) and t["emissor"], f"emissor vazio: {t['emissor']!r}"
         for campo in CAMPOS_DECIMAL_OU_NONE:
             valor = t[campo]
             assert valor is None or isinstance(valor, Decimal), (

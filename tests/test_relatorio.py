@@ -99,9 +99,7 @@ def test_cli_no_offline_falha_com_erro_claro(tmp_path: Path) -> None:
     substituição silenciosa e sem escrever arquivo.
     """
     destino = tmp_path / "r.md"
-    resultado = runner.invoke(
-        app, ["relatorio", "gerar", "--no-offline", "--output", str(destino)]
-    )
+    resultado = runner.invoke(app, ["relatorio", "gerar", "--no-offline", "--output", str(destino)])
     assert resultado.exit_code == 1
     assert "LLM" in resultado.stdout
     assert "offline" in resultado.stdout.lower()

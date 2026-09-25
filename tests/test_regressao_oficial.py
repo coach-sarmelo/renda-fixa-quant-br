@@ -22,9 +22,7 @@ import pytest
 from rfquant.data.tesouro_oficial import TesouroOficialProvider
 from rfquant.pricing import pu
 
-CAMINHO_FIXTURE_REGRESSAO = (
-    Path(__file__).parent / "fixtures" / "tesouro_regressao_oficial.csv"
-)
+CAMINHO_FIXTURE_REGRESSAO = Path(__file__).parent / "fixtures" / "tesouro_regressao_oficial.csv"
 
 # Trio dentro da tolerância, conforme a nota do cabeçalho de auditoria da fixture
 # ("os LTNs de vencimento 2025/2026/2027 batem com pu.calcular a 4,0e-4 /

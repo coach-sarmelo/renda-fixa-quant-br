@@ -41,6 +41,7 @@ def macaulay(
 
     return soma_ponderada / pu
 
+
 def modificada(
     data_compra: date,
     data_vencimento: date,

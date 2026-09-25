@@ -9,6 +9,7 @@ from rfquant.pricing.fluxo_caixa import Fluxo, gerar_fluxos
 # Número de dias úteis por ano (convenção do mercado brasileiro)
 DU_ANO = 252
 
+
 def dias_uteis(inicio: date, fim: date) -> int:
     """Estima dias úteis entre duas datas.
 
@@ -19,6 +20,7 @@ def dias_uteis(inicio: date, fim: date) -> int:
         return 0
     dias_corridos = (fim - inicio).days
     return max(round(dias_corridos * DU_ANO / 365), 1)
+
 
 def calcular(
     data_compra: date,
@@ -41,6 +43,7 @@ def calcular(
         frequencia_cupom=frequencia_cupom,
     )
     return _pu_de_fluxos(fluxos, data_compra, taxa_anual)
+
 
 def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> float:
     """Desconta os fluxos a ``taxa_anual`` — validação central de taxa.

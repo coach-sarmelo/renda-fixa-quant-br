@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 TipoTitulo = Literal["Prefixado", "IPCA+", "Selic", "CDI", "Outro"]
 
+
 class Titulo(BaseModel):
     """Representação normalizada de um título de renda fixa."""
 
@@ -25,6 +26,7 @@ class Titulo(BaseModel):
     data_referencia: date
     isento_ir: bool = False
     emissor: str = "Tesouro Nacional"
+
 
 class DataProvider(ABC):
     """Interface para acesso a dados de renda fixa."""

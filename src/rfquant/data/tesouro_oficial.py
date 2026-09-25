@@ -71,15 +71,19 @@ class TesouroOficialProvider(DataProvider):
             & (bruto["Data Base"] >= pd.Timestamp(inicio))
             & (bruto["Data Base"] <= pd.Timestamp(fim))
         ]
-        return pd.DataFrame(
-            {
-                "data": sel["Data Base"].dt.date,
-                "taxa_compra": sel["Taxa Compra Manha"] / 100,
-                "taxa_venda": sel["Taxa Venda Manha"] / 100,
-                "pu_compra": sel["PU Compra Manha"],
-                "pu_venda": sel["PU Venda Manha"],
-            }
-        ).sort_values("data").reset_index(drop=True)
+        return (
+            pd.DataFrame(
+                {
+                    "data": sel["Data Base"].dt.date,
+                    "taxa_compra": sel["Taxa Compra Manha"] / 100,
+                    "taxa_venda": sel["Taxa Venda Manha"] / 100,
+                    "pu_compra": sel["PU Compra Manha"],
+                    "pu_venda": sel["PU Venda Manha"],
+                }
+            )
+            .sort_values("data")
+            .reset_index(drop=True)
+        )
 
     # ------------------------------------------------------------------
     # Internos

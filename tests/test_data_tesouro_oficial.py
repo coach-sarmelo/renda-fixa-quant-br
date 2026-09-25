@@ -36,7 +36,9 @@ def provider_oficial(monkeypatch, cache_isolado) -> TesouroOficialProvider:
     return TesouroOficialProvider()
 
 
-def test_titulos_disponiveis_so_data_base_mais_recente(provider_oficial: TesouroOficialProvider) -> None:
+def test_titulos_disponiveis_so_data_base_mais_recente(
+    provider_oficial: TesouroOficialProvider,
+) -> None:
     """Sem `data`, retorna apenas a última Data Base do arquivo (2 dos 3 títulos)."""
     df = provider_oficial.titulos_disponiveis()
     assert len(df) == 2
@@ -149,7 +151,16 @@ def test_parsear_fixture_real_mantem_schema() -> None:
     assert list(df.columns) == COLUNAS_CSV_OFICIAL
     assert pd.api.types.is_datetime64_any_dtype(df["Data Base"])
     assert pd.api.types.is_datetime64_any_dtype(df["Data Vencimento"])
-    n_dados = len([linha_cruda for linha_cruda in _fixture_real().splitlines() if linha_cruda and not linha_cruda.startswith("#")]) - 1
+    n_dados = (
+        len(
+            [
+                linha_cruda
+                for linha_cruda in _fixture_real().splitlines()
+                if linha_cruda and not linha_cruda.startswith("#")
+            ]
+        )
+        - 1
+    )
     assert len(df) == n_dados
 
 
@@ -192,9 +203,7 @@ def test_historico_com_fixture_real_devolve_serie_ordenada(provider_real) -> Non
     """historico_taxas sobre a fixture real: várias datas, crescentes."""
     df = provider_real.titulos_disponiveis()
     nome = str(df.iloc[0]["nome"])
-    serie = provider_real.historico_taxas(
-        nome, inicio=date(2000, 1, 1), fim=date(2100, 1, 1)
-    )
+    serie = provider_real.historico_taxas(nome, inicio=date(2000, 1, 1), fim=date(2100, 1, 1))
     assert len(serie) >= 3  # excerto cobre várias datas-base
     datas = list(serie["data"])
     assert datas == sorted(datas)

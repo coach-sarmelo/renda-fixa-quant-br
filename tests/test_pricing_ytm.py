@@ -20,11 +20,13 @@ def test_ytm_inversa_do_pu() -> None:
 
     assert y == pytest.approx(taxa_original, abs=1e-6)
 
+
 def test_ytm_zero_cupom_pu_maior() -> None:
     """PU maior que o nominal → YTM negativa."""
     p = 1100.0
     y = ytm.calcular(p, date(2026, 1, 1), date(2027, 1, 1), 1000.0, 0.0)
     assert y < 0
+
 
 def test_ytm_pu_menor() -> None:
     """PU menor que o nominal → YTM positiva."""
@@ -32,10 +34,12 @@ def test_ytm_pu_menor() -> None:
     y = ytm.calcular(p, date(2026, 1, 1), date(2027, 1, 1), 1000.0, 0.0)
     assert y > 0
 
+
 def test_ytm_pu_invalido() -> None:
     """PU não positivo deve levantar ValueError."""
     with pytest.raises(ValueError):
         ytm.calcular(0.0, date(2026, 1, 1), date(2027, 1, 1), 1000.0, 0.0)
+
 
 def test_ytm_com_cupom() -> None:
     """Roundtrip com cupons semestrais recupera a taxa com tol 1e-6."""

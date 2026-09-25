@@ -22,6 +22,7 @@ def test_zero_cupom_pu_exato_1e9() -> None:
     )
     assert p == pytest.approx(1000.0 / 1.10, rel=1e-9)
 
+
 def test_pu_cupom_semestral_soma_dos_fluxos_descontados() -> None:
     """PU com cupons semestrais = soma dos fluxos descontados,
     verificado com a soma re-derivada explicitamente no teste."""
@@ -41,12 +42,14 @@ def test_pu_cupom_semestral_soma_dos_fluxos_descontados() -> None:
     )
     assert p == pytest.approx(esperado, rel=1e-9)
 
+
 @pytest.mark.parametrize(("taxa"), [-1.0, -1.5, -2.0])
 def test_taxa_menos_ou_igual_menos_100_pct_levanta_value_error(taxa: float) -> None:
     """Taxa <= -100% deve levantar ValueError com mensagem pt-BR
     (hoje: -1,0 vira ZeroDivisionError; -1,5 vira PU negativo silencioso)."""
     with pytest.raises(ValueError, match="-100%"):
         pu.calcular(date(2026, 1, 1), date(2031, 1, 1), taxa, 1000.0, 0.0)
+
 
 def test_zero_cupom_taxa_zero() -> None:
     """Com taxa zero, PU deve ser igual ao valor nominal."""
@@ -59,11 +62,13 @@ def test_zero_cupom_taxa_zero() -> None:
     )
     assert p == pytest.approx(1000.0, rel=1e-9)
 
+
 def test_pu_dimiui_com_taxa() -> None:
     """PU deve ser decrescente em relação à taxa de desconto."""
     p_baixo = pu.calcular(date(2026, 1, 1), date(2029, 1, 1), 0.08, 1000.0, 0.0)
     p_alto = pu.calcular(date(2026, 1, 1), date(2029, 1, 1), 0.15, 1000.0, 0.0)
     assert p_alto < p_baixo
+
 
 def test_pu_com_cupom_maior_que_zero_cupom() -> None:
     """Um título com cupom deve ter PU maior que o mesmo zero-cupom."""
@@ -75,10 +80,12 @@ def test_pu_com_cupom_maior_que_zero_cupom() -> None:
     )
     assert p_com_cupom > p_sem_cupom
 
+
 def test_pu_data_invalida() -> None:
     """Vencimento anterior à compra deve levantar ValueError."""
     with pytest.raises(ValueError):
         pu.calcular(date(2027, 1, 1), date(2026, 1, 1), 0.10)
+
 
 def test_dias_uteis_positivo() -> None:
     """Dias úteis entre duas datas deve ser sempre positivo."""

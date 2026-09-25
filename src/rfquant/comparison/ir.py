@@ -26,6 +26,7 @@ FAIXAS_IR: list[tuple[int, float]] = [
     (10**9, 0.150),
 ]
 
+
 def aliquota(prazo_dias: int) -> float:
     """Retorna a alíquota de IR (fração) para um prazo em dias corridos.
 
@@ -41,6 +42,7 @@ def aliquota(prazo_dias: int) -> float:
         if prazo_dias <= limite:
             return aliq
     return FAIXAS_IR[-1][1]
+
 
 def ir_devido(rendimento: float, prazo_dias: int, isento: bool = False) -> float:
     """Calcula o IR devido sobre o rendimento.
@@ -59,6 +61,7 @@ def ir_devido(rendimento: float, prazo_dias: int, isento: bool = False) -> float
         return 0.0
     return rendimento * aliquota(prazo_dias)
 
+
 def rendimento_liquido(
     rendimento: float,
     prazo_dias: int,
@@ -67,15 +70,42 @@ def rendimento_liquido(
     """Retorna o rendimento líquido após IR."""
     return rendimento - ir_devido(rendimento, prazo_dias, isento)
 
+
 # ----------------------------------------------------------------------
 # IOF regressivo (resgates < 30 dias)
 # ----------------------------------------------------------------------
 IOF_TABELA: dict[int, float] = {
-    1: 0.96, 2: 0.93, 3: 0.90, 4: 0.86, 5: 0.83, 6: 0.80, 7: 0.76, 8: 0.73,
-    9: 0.70, 10: 0.66, 11: 0.63, 12: 0.60, 13: 0.56, 14: 0.53, 15: 0.50,
-    16: 0.46, 17: 0.43, 18: 0.40, 19: 0.36, 20: 0.33, 21: 0.30, 22: 0.26,
-    23: 0.23, 24: 0.20, 25: 0.16, 26: 0.13, 27: 0.10, 28: 0.06, 29: 0.03,
+    1: 0.96,
+    2: 0.93,
+    3: 0.90,
+    4: 0.86,
+    5: 0.83,
+    6: 0.80,
+    7: 0.76,
+    8: 0.73,
+    9: 0.70,
+    10: 0.66,
+    11: 0.63,
+    12: 0.60,
+    13: 0.56,
+    14: 0.53,
+    15: 0.50,
+    16: 0.46,
+    17: 0.43,
+    18: 0.40,
+    19: 0.36,
+    20: 0.33,
+    21: 0.30,
+    22: 0.26,
+    23: 0.23,
+    24: 0.20,
+    25: 0.16,
+    26: 0.13,
+    27: 0.10,
+    28: 0.06,
+    29: 0.03,
 }
+
 
 def iof(rendimento: float, prazo_dias: int) -> float:
     """Calcula o IOF regressivo para prazos < 30 dias.
@@ -87,6 +117,7 @@ def iof(rendimento: float, prazo_dias: int) -> float:
     if prazo_dias >= 30:
         return 0.0
     return rendimento * IOF_TABELA.get(prazo_dias, 0.0)
+
 
 # ----------------------------------------------------------------------
 # API de alto nível
@@ -109,6 +140,7 @@ class ResultadoLiquido:
         if self.rendimento_bruto <= 0:
             return 0.0
         return self.rendimento_liquido / self.rendimento_bruto
+
 
 def calcular(
     rendimento_bruto: float,
@@ -136,11 +168,13 @@ def calcular(
         isento=isento,
     )
 
+
 def prazo_entre_datas(inicio: date, fim: date) -> int:
     """Dias corridos entre duas datas (equivalente ao prazo da RF)."""
     if fim < inicio:
         raise ValueError("Data final deve ser >= inicial.")
     return (fim - inicio).days
+
 
 def aliquota_por_datas(inicio: date, fim: date, isento: bool = False) -> float:
     """Alíquota de IR dadas as datas de aplicação e resgate."""
