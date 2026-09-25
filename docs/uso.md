@@ -389,3 +389,4 @@ make format  # formata com ruff
 | Primeira listagem do dia demora | O CSV oficial (~14,5 MB) está sendo baixado; execuções seguintes leem do cache de 24 h (`~/.rfquant/cache`). |
 | `rfq relatorio gerar --no-offline` termina com erro | Comportamento esperado: não existe geração por IA. Use o padrão (`--offline`). |
 | PU difere do site do Tesouro | Aproximação de dias úteis (D6) — o erro cresce com o prazo. Tabelas medidas em [dados.md](dados.md). |
+| Acentos quebrados na saída (ex.: `Compara��o`) | O terminal está numa codepage OEM. No Prompt de Comando, rode `chcp 65001` antes da CLI; no PowerShell, `$env:PYTHONUTF8 = "1"`; ou use o Windows Terminal. |

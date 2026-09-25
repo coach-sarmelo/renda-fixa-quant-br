@@ -16,6 +16,14 @@ título:
   `valor_nominal × taxa_cupom_anual / frequencia_cupom`, mais o principal
   junto ao último cupom.
 
+> **Limitação declarada:** o cupom é **linear** (`VN × i / f`). O padrão
+> STN/ANBIMA para títulos cupomados é **composto** —
+> `VN × ((1 + i)^(1/f) − 1)` — que daria R$ 48,81 por cupom numa NTN-F de
+> 10% a.a., contra os R$ 50,00 da fórmula linear (desvio de ~2,4% por
+> cupom). A convenção composta é aprimoramento planejado; até lá, o PU de
+> títulos cupomados diverge do oficial também por este motivo, além da
+> aproximação de dias úteis.
+
 ## 2. Preço Unitário (PU)
 
 $$PU = \sum_{t=1}^{n} \frac{FC_t}{(1 + y)^{du_t / 252}}$$
@@ -181,8 +189,9 @@ Simples e robusta; não produz curva suave entre pontos distantes.
 $$y(\tau) = \beta_0 + \beta_1 \cdot \frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} + \beta_2 \cdot \left[\frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} - e^{-\tau/\lambda}\right]$$
 
 Ajuste paramétrico suave (padrão de mercado), com parâmetros estimados por
-mínimos quadrados (`scipy.optimize.curve_fit`). Se o ajuste não converge,
-o código cai no interpolação linear automaticamente.
+mínimos quadrados (`scipy.optimize.curve_fit`). Se o ajuste não converge, o
+fallback **não é** a interpolação linear: o código fixa uma curva flat na
+última taxa observada (β₀ = última taxa, β₁ = β₂ = 0) até nova execução.
 
 A ETTJ também expõe o fator de desconto `(1 + y(τ))^(−τ)`.
 

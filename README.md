@@ -155,6 +155,12 @@ explícitas e dados oficiais — nunca de fontes não auditáveis. Detalhes em
 - A comparação de taxas aplica o IR de forma linear pela alíquota do prazo
   informado — aproximação exata apenas para horizonte de 1 ano
   ([formulas.md](docs/formulas.md)).
+- **Cupom linear:** o gerador de fluxos usa cupom linear (`VN × i / f`), não
+  o composto do padrão STN/ANBIMA (NTN-F 10% a.a.: R$ 50,00 vs R$ 48,81 por
+  cupom) — [formulas.md](docs/formulas.md).
+- **Console Windows:** em terminais com codepage OEM os acentos podem sair
+  quebrados; use Windows Terminal ou `chcp 65001`
+  ([uso.md](docs/uso.md)).
 
 ## Documentação
 
