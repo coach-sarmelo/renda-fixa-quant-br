@@ -12,6 +12,7 @@ Uso:
 from __future__ import annotations
 
 import re
+import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -25,9 +26,11 @@ from rich.table import Table
 from rfquant import __version__
 from rfquant.comparison import ir, taxa_equivalente
 from rfquant.config import settings
-from rfquant.data import SGSProvider, TesouroDiretoProvider, TesouroOficialProvider, Titulo
+from rfquant.data import TesouroDiretoProvider, TesouroOficialProvider, Titulo
 from rfquant.data.base import DataProvider
 from rfquant.data.cvm_fundos import (
+    InformeNaoDisponivel,
+    RedeIndisponivel,
     percentual_cdi,
     rentabilidade_anualizada,
     rentabilidade_periodo,
@@ -279,6 +282,14 @@ def comparar(
             "[red]--cdi deve ser positivo:[/] informe o CDI anual em % a.a. (ex.: --cdi 13.0)."
         )
         raise typer.Exit(code=1)
+    # Prazo <= 0 estoura o ValueError do núcleo de IR (ir.aliquota) — mesmo
+    # tratamento de entrada: erro pt-BR antes de qualquer cálculo.
+    if prazo <= 0:
+        console.print(
+            "[red]--prazo deve ser positivo:[/] informe o prazo em dias "
+            "corridos (ex.: --prazo 720)."
+        )
+        raise typer.Exit(code=1)
 
     produtos: list[taxa_equivalente.ProdutoRF] = []
 
@@ -288,13 +299,21 @@ def comparar(
             cdi_valor = cdi / 100
             fonte_cdi = "informado"
         else:
+            provider_cdi = provider_do_dado("cdi")
             try:
                 cdi_valor = taxa_equivalente.cdi_anual_do_provider(
-                    SGSProvider(), date.today() - timedelta(days=365), date.today()
+                    provider_cdi, date.today() - timedelta(days=365), date.today()
                 )
             except requests.RequestException as erro:
                 _falha_de_rede("obter o CDI da série SGS/BCB", erro)
-            fonte_cdi = "SGS"
+            except ValueError as erro:
+                # SGS sem dados responde 200 + {"erro": ...} — forma de erro
+                # real do BCB e o provider levanta ValueError; sem traceback
+                # cru (espelho do except ValueError de fundos resumo).
+                console.print(f"[red]Erro ao obter o CDI da série SGS/BCB:[/] {erro}")
+                raise typer.Exit(code=1) from None
+            # rótulo do anúncio vem do mapa declarado (fontes.py)
+            fonte_cdi = rotulo_do_provider(provider_cdi)
         console.print(f"CDI ({fonte_cdi}): {cdi_valor:.2%}")
 
     if cdb is not None:
@@ -365,6 +384,13 @@ def comparar(
             "sim" if r.produto.isento else "não",
         )
     console.print(tabela)
+    console.print()
+    console.print(
+        "Material de caráter informativo: apresenta a comparação calculada "
+        "dos produtos informados, líquida de IR, e não constitui oferta, "
+        "proposta de investimento ou forma de captar recursos junto ao público."
+    )
+    console.print("Referência normativa: Resolução CVM 20/2021.")
 
 
 # ----------------------------------------------------------------------
@@ -387,14 +413,34 @@ def fundos_resumo(
         console.print(f"[red]Mês inválido:[/] '{mes}'. Use o formato AAAA-MM (ex.: 2026-08).")
         raise typer.Exit(code=1) from None
 
+    # CNPJ validado na entrada: um CNPJ sem os 14 dígitos (ex.: "" ou raiz
+    # parcial) cairia no ramo falsy do filtro do provider e devolveria o
+    # mercado inteiro como se fosse o resumo do fundo.
+    if len(re.sub(r"\D", "", cnpj)) != 14:
+        console.print(
+            f"[red]CNPJ inválido:[/] '{cnpj}' não tem 14 dígitos — informe o "
+            "CNPJ completo (com ou sem pontuação; ex.: 00.017.024/0001-53)."
+        )
+        raise typer.Exit(code=1)
+
     provider = provider_do_dado("fundos")
     console.print(f"fonte: {rotulo_do_provider(provider)}")
 
     try:
         df = provider.informe_diario(referencia.year, referencia.month, cnpj=cnpj)
-    except (requests.RequestException, RuntimeError) as erro:
-        # rede direta ou embrulhada pelo provider (mês sem arquivo/publicação)
+    except RedeIndisponivel as erro:
+        # rede — a causa original segue encadeada na exceção de domínio
         _falha_de_rede("obter o informe da CVM", erro)
+    except InformeNaoDisponivel as erro:
+        # mês sem arquivo publicado na fonte: erro de domínio, distinto de
+        # falha de rede — mensagem específica em vez do achatamento
+        console.print(f"[red]{erro}[/]")
+        raise typer.Exit(code=1) from None
+    except (ValueError, zipfile.BadZipFile) as erro:
+        # payload ilegível (ZIP sem entradas ou resposta truncada): erro
+        # explícito em pt-BR, sem traceback cru
+        console.print(f"[red]Informe ilegível:[/] {erro}")
+        raise typer.Exit(code=1) from None
 
     if df.empty:
         console.print(
@@ -406,7 +452,7 @@ def fundos_resumo(
     try:
         acumulada = rentabilidade_periodo(df)
         anualizada = rentabilidade_anualizada(df)
-        pct_cdi = percentual_cdi(df, SGSProvider())
+        pct_cdi = percentual_cdi(df, provider_do_dado("cdi"))
     except requests.RequestException as erro:
         _falha_de_rede("obter o CDI da série SGS/BCB", erro)
     except ValueError as erro:
@@ -420,6 +466,14 @@ def fundos_resumo(
     console.print(f"[bold]Rentabilidade acumulada:[/] {acumulada:.4%}")
     console.print(f"[bold]Rentabilidade anualizada:[/] {anualizada:.4%}")
     console.print(f"[bold]% do CDI:[/] {pct_cdi:.2%}")
+    console.print()
+    console.print(
+        "Material de caráter informativo: apresenta métricas calculadas do "
+        "informe diário público da CVM para o fundo informado e não constitui "
+        "oferta, proposta de investimento ou forma de captar recursos junto "
+        "ao público."
+    )
+    console.print("Referência normativa: Resolução CVM 20/2021.")
 
 
 # ----------------------------------------------------------------------

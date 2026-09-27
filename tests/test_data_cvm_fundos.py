@@ -53,6 +53,8 @@ from rfquant.data.cvm_fundos import (
     TTL_CVM,
     USER_AGENT,
     CVMFundosProvider,
+    InformeNaoDisponivel,
+    RedeIndisponivel,
     percentual_cdi,
     rentabilidade_anualizada,
     rentabilidade_periodo,
@@ -247,23 +249,26 @@ def test_cnpj_digito_diferente_ou_parcial_nao_casa(
 # Erros explícitos (fim do `except Exception: pass`)
 # ----------------------------------------------------------------------
 def test_mes_ausente_erro_explicito_ptbr(monkeypatch, cache_isolado) -> None:
-    """Mês sem arquivo publicado (HTTP 404) ⇒ RuntimeError pt-BR, com causa."""
+    """Mês sem arquivo publicado (HTTP 404) ⇒ InformeNaoDisponivel pt-BR com
+    a causa encadeada — erro de domínio distinto de rede."""
     fetch = _FetchCVM(FIXTURE_ZIP.read_bytes(), cenario="mes_ausente")
     monkeypatch.setattr(requests, "get", fetch)
     provider = CVMFundosProvider()
-    with pytest.raises(RuntimeError, match="Falha ao obter o informe diário da CVM para 09/2026"):
+    with pytest.raises(InformeNaoDisponivel, match="não está disponível na fonte") as exc:
         provider.informe_diario(2026, 9)
+    assert isinstance(exc.value.__cause__, requests.HTTPError)
+    assert isinstance(exc.value, RuntimeError)  # compat: subclasse de RuntimeError
     assert fetch.urls[-1].endswith("inf_diario_fi_202609.zip")
-    with pytest.raises(RuntimeError, match="ainda não ter sido publicado"):
+    with pytest.raises(InformeNaoDisponivel, match="ainda não ter sido publicado"):
         provider.informe_diario(2099, 1)
 
 
 def test_falha_de_rede_erro_explicito_ptbr(monkeypatch, cache_isolado) -> None:
-    """ConnectionError na origem ⇒ RuntimeError pt-BR com a causa encadeada."""
+    """ConnectionError na origem ⇒ RedeIndisponivel pt-BR com a causa encadeada."""
     fetch = _FetchCVM(FIXTURE_ZIP.read_bytes(), cenario="rede_cai")
     monkeypatch.setattr(requests, "get", fetch)
     provider = CVMFundosProvider()
-    with pytest.raises(RuntimeError, match="rede está indisponível") as exc:
+    with pytest.raises(RedeIndisponivel, match="Falha ao obter o informe diário da CVM") as exc:
         provider.informe_diario(ANO, MES)
     assert isinstance(exc.value.__cause__, requests.ConnectionError), (
         "erro original deve vir encadeado (`from`), não engolido"
@@ -280,7 +285,7 @@ def test_historico_fundo_propaga_erro_de_mes_ausente(monkeypatch, cache_isolado)
     fetch = _FetchCVM(FIXTURE_ZIP.read_bytes(), cenario="mes_ausente")
     monkeypatch.setattr(requests, "get", fetch)
     provider = CVMFundosProvider()
-    with pytest.raises(RuntimeError, match="Falha ao obter o informe diário da CVM"):
+    with pytest.raises(InformeNaoDisponivel, match="não está disponível na fonte"):
         provider.historico_fundo(CNPJ_F1, inicio=date(2026, 7, 1), fim=date(2026, 8, 31))
 
 
@@ -371,6 +376,40 @@ def test_usar_cache_false_forca_redownload(
     provider_cvm.informe_diario(ANO, MES, usar_cache=False)
     assert fetch_cvm.chamadas == 2
     provider_cvm.informe_diario(ANO, MES)
+    assert fetch_cvm.chamadas == 2
+
+
+def test_frame_parseado_cacheado_alem_do_zip(
+    provider_cvm: CVMFundosProvider, fetch_cvm: _FetchCVM, monkeypatch
+) -> None:
+    """Cache de frame além do ZIP: a 2ª chamada do MESMO mês não re-parseia o
+    informe (read_csv roda 1×) nem re-baixa (HTTP 1×) — e o frame hit devolve
+    o mesmo contrato da 1ª."""
+    parses = {"n": 0}
+    read_csv_original = pd.read_csv
+
+    def read_csv_contado(*args, **kwargs):
+        parses["n"] += 1
+        return read_csv_original(*args, **kwargs)
+
+    monkeypatch.setattr(pd, "read_csv", read_csv_contado)
+    df1 = provider_cvm.informe_diario(ANO, MES)
+    df2 = provider_cvm.informe_diario(ANO, MES)
+    assert fetch_cvm.chamadas == 1
+    assert parses["n"] == 1
+    validar_contrato_informe(df2)
+    assert df1.equals(df2)
+
+
+def test_frame_cache_nao_vaza_entre_meses(
+    provider_cvm: CVMFundosProvider, fetch_cvm: _FetchCVM
+) -> None:
+    """A chave do frame deriva da URL do mês: meses distintos parseiam cada
+    um o seu (2 HTTP), e repetir o mês é hit de frame (segue 2)."""
+    provider_cvm.informe_diario(2026, 8)
+    provider_cvm.informe_diario(2026, 9)
+    assert fetch_cvm.chamadas == 2
+    provider_cvm.informe_diario(2026, 8)
     assert fetch_cvm.chamadas == 2
 
 

@@ -12,6 +12,8 @@ Comportamento existente — estes testes o fixam como contrato
 
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import date
 
 import pytest
@@ -276,6 +278,9 @@ def test_comparar_imprime_tabela_liquida_ordenada() -> None:
         assert produto in saida
     # título traz a alíquota do prazo (720 dias) — fonte única é ir.aliquota
     assert f"IR {ir.aliquota(720):.1%}" in saida
+    # disclaimer educacional (Resolução CVM 20/2021) fecha a saída
+    assert "não constitui oferta" in saida
+    assert "CVM 20/2021" in saida
     # ordenação avaliada nas LINHAS DE DADOS ("CDB" também ocorre no cabeçalho
     # "Equivalente CDB"): primeira linha = LCI/LCA (isenta lidera), depois CDB
     # e Tesouro
@@ -382,6 +387,36 @@ def test_comparar_cdi_nao_positivo_erro_ptbr() -> None:
         assert isinstance(resultado.exception, SystemExit)
 
 
+@pytest.mark.parametrize("valor", ["0", "-10"])
+def test_comparar_prazo_nao_positivo_erro_ptbr(valor: str) -> None:
+    """--prazo zero ou negativo: o ValueError do núcleo de IR (ir.aliquota)
+    não escapa como traceback cru — a guarda de entrada rejeita em pt-BR com
+    exit 1 antes de qualquer cálculo (SystemExit no runner)."""
+    resultado = runner.invoke(app, ["comparar", "--cdb", "12.0", f"--prazo={valor}"])
+    assert resultado.exit_code == 1, valor
+    saida = resultado.stdout
+    assert "deve ser positivo" in saida
+    assert "--prazo" in saida
+    assert isinstance(resultado.exception, SystemExit)
+
+
+def test_comparar_cdi_auto_sgs_sem_dados_erro_ptbr(monkeypatch, cache_isolado) -> None:
+    """SGS sem dados responde 200 + {"erro": ...} — forma de erro real do
+    BCB e o provider levanta ValueError: erro pt-BR + exit 1, sem traceback
+    cru (espelho do except ValueError de fundos resumo; SystemExit no runner)."""
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda *args, **kwargs: RespostaFake({"erro": {"statusCode": 404, "name": "Erro"}}),
+    )
+    resultado = runner.invoke(app, ["comparar", "--cdb-cdi", "110", "--cdi-auto"])
+    assert resultado.exit_code == 1
+    saida = resultado.stdout
+    assert "Erro ao obter o CDI" in saida
+    assert "SGS" in saida
+    assert isinstance(resultado.exception, SystemExit)
+
+
 def test_comparar_cdb_cdi_com_cdi_informado_converte_pela_regra_do_nucleo() -> None:
     """--cdb-cdi 110 com --cdi 13.0: anuncia a fonte do CDI e a taxa bruta
     sai da conversão do núcleo (110% × 13% = 14,3% a.a.), não da flag."""
@@ -403,7 +438,9 @@ def test_comparar_cdb_cdi_auto_busca_a_serie_sgs(http_fixture_sgs) -> None:
     resultado = runner.invoke(app, ["comparar", "--cdb-cdi", "110", "--cdi-auto"])
     assert resultado.exit_code == 0
     saida = resultado.stdout
-    assert "CDI (SGS)" in saida
+    # rótulo derivado do mapa declarado (fontes.py) — "sgs", como nos
+    # anúncios "fonte: sgs"/"fonte: cvm" dos demais comandos
+    assert "CDI (sgs)" in saida
     assert f"{taxa_esperada:.4%}" in saida
 
 
@@ -472,6 +509,9 @@ def test_fundos_resumo_mostra_os_tres_numeros_e_anuncia_a_fonte(
     assert f"{rentabilidade_periodo(df):.4%}" in saida
     assert f"{rentabilidade_anualizada(df):.4%}" in saida
     assert f"{percentual_cdi(df, SGSProvider()):.2%}" in saida
+    # disclaimer educacional (Resolução CVM 20/2021) fecha a saída
+    assert "não constitui oferta" in saida
+    assert "CVM 20/2021" in saida
 
 
 def test_fundos_resumo_aceita_cnpj_sem_pontuacao(http_fixture_fundos) -> None:
@@ -487,9 +527,11 @@ def test_fundos_resumo_aceita_cnpj_sem_pontuacao(http_fixture_fundos) -> None:
     assert "Rentabilidade anualizada" in saida
 
 
-def test_fundos_resumo_mes_ausente_erro_ptbr(monkeypatch, cache_isolado) -> None:
-    """Mês sem arquivo publicado (HTTP 404): falha de rede tratada pt-BR +
-    exit 1, com dica acionável e sem traceback cru (SystemExit no runner)."""
+def test_fundos_resumo_mes_nao_publicado_erro_ptbr(monkeypatch, cache_isolado) -> None:
+    """Mês sem arquivo publicado (HTTP 404): erro de DOMÍNIO distinto de rede —
+    mensagem específica do provider ("não está disponível... ainda não ter sido
+    publicado") + exit 1, sem traceback cru e sem o achatamento "Falha de
+    rede" (mês não publicado não é falha de conexão)."""
     monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaErro())
     resultado = runner.invoke(
         app, ["fundos", "resumo", "--cnpj", "00.017.024/0001-53", "--mes", "2099-08"]
@@ -497,8 +539,40 @@ def test_fundos_resumo_mes_ausente_erro_ptbr(monkeypatch, cache_isolado) -> None
     assert resultado.exit_code == 1
     # saída normalizada: o rich quebra linhas longas a qualquer espaço
     saida_plana = " ".join(resultado.stdout.split())
-    assert "Falha de rede ao obter o informe da CVM" in saida_plana
-    assert "Verifique sua conexão" in saida_plana
+    assert "não está disponível" in saida_plana
+    assert "ainda não ter sido publicado" in saida_plana
+    assert "Falha de rede" not in saida_plana
+    assert isinstance(resultado.exception, SystemExit)
+
+
+def test_fundos_resumo_zip_truncado_erro_ptbr(monkeypatch, cache_isolado) -> None:
+    """Resposta 200 com corpo que não é ZIP (truncada/corrompida): o
+    zipfile.BadZipFile não escapa cru — "Informe ilegível" + exit 1
+    (SystemExit no runner)."""
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaZip(b"nao-e-um-zip"))
+    resultado = runner.invoke(
+        app, ["fundos", "resumo", "--cnpj", "00.017.024/0001-53", "--mes", "2026-08"]
+    )
+    assert resultado.exit_code == 1
+    saida = resultado.stdout
+    assert "Informe ilegível" in saida
+    assert isinstance(resultado.exception, SystemExit)
+
+
+def test_fundos_resumo_zip_sem_entradas_erro_ptbr(monkeypatch, cache_isolado) -> None:
+    """ZIP 200 sem nenhuma entrada (o ValueError "ZIP vazio" do provider):
+    erro explícito pt-BR + exit 1, sem traceback cru."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w"):
+        pass  # ZIP válido com zero entradas
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaZip(buffer.getvalue()))
+    resultado = runner.invoke(
+        app, ["fundos", "resumo", "--cnpj", "00.017.024/0001-53", "--mes", "2026-08"]
+    )
+    assert resultado.exit_code == 1
+    saida = resultado.stdout
+    assert "Informe ilegível" in saida
+    assert "ZIP vazio" in saida
     assert isinstance(resultado.exception, SystemExit)
 
 
@@ -532,6 +606,24 @@ def test_fundos_resumo_mes_invalido_erro_ptbr() -> None:
     assert "Mês inválido" in saida
     assert "08/2026" in saida
     assert "AAAA-MM" in saida
+    assert isinstance(resultado.exception, SystemExit)
+
+
+@pytest.mark.parametrize(
+    "cnpj",
+    ["", "abc", "00.017.024", "00.017.024/0001-5X"],
+    ids=["vazio", "lixo", "raiz_parcial", "digitos_verificadores_letra"],
+)
+def test_fundos_resumo_cnpj_sem_14_digitos_erro_ptbr(cnpj: str) -> None:
+    """--cnpj sem os 14 dígitos (vazio, lixo, parcial, dígito trocado por
+    letra): rejeitado na entrada com erro pt-BR + exit 1 — nunca chega ao
+    provider, onde o valor falsy imprimiria as métricas do mercado inteiro
+    como se fossem o resumo do fundo."""
+    resultado = runner.invoke(app, ["fundos", "resumo", "--cnpj", cnpj, "--mes", "2026-08"])
+    assert resultado.exit_code == 1, cnpj
+    saida = resultado.stdout
+    assert "CNPJ inválido" in saida
+    assert "14 dígitos" in saida
     assert isinstance(resultado.exception, SystemExit)
 
 

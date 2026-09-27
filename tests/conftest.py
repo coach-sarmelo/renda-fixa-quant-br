@@ -66,10 +66,18 @@ class RespostaZip:
 
 
 class RespostaErro:
-    """Resposta HTTP falsa que falha no ``raise_for_status`` (mês sem arquivo)."""
+    """Resposta HTTP falsa que falha no ``raise_for_status`` (mês sem arquivo).
+
+    Fiel ao ``raise_for_status`` real do requests: o ``HTTPError`` carrega a
+    própria resposta (``response=self``) e a resposta expõe ``status_code``
+    404 — é por esse status que o provider distingue mês não publicado
+    (HTTP 4xx) de falha de rede.
+    """
+
+    status_code = 404
 
     def raise_for_status(self) -> None:
-        raise requests.HTTPError("404 Client Error: Not Found for url: fake")
+        raise requests.HTTPError("404 Client Error: Not Found for url: fake", response=self)
 
 
 @pytest.fixture

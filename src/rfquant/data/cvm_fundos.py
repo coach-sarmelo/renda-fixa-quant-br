@@ -26,7 +26,9 @@ explícito de 24 h — o informe troca 1×/dia útil intramês e congela no
 fechamento do mês — e ``User-Agent`` explícito (UA de biblioteca
 sofre filtro em fontes públicas). Este TTL substitui o antigo cache de arquivo
 sem expiração (``~/.rfquant/cache/cvm`` crescia sem limite e nunca
-vencia).
+vencia). O frame mensal PARSEADO também é cacheado, além do ZIP cru (mesmo
+TTL) — o ``read_csv`` do informe integral roda no cache miss, não a cada
+chamada.
 """
 
 from __future__ import annotations
@@ -62,6 +64,20 @@ COLUNAS_PT = {
     "RESG_DIA": "resgate_dia",
     "NR_COTST": "numero_cotistas",
 }
+
+
+class InformeNaoDisponivel(RuntimeError):
+    """O arquivo do mês não está publicado na fonte (HTTP 4xx) — erro de
+    domínio do provider, distinto de falha de rede: o informe de um mês
+    ainda não publicado (a CVM publica D+1) não existe no portal. Subclasse
+    de ``RuntimeError`` por compatibilidade com quem já capturava a exceção
+    anterior deste módulo."""
+
+
+class RedeIndisponivel(RuntimeError):
+    """Falha de rede ao obter o informe (timeout, DNS, HTTP 5xx) — a
+    ``requests.RequestException`` original segue encadeada em ``__cause__``.
+    Subclasse de ``RuntimeError`` pelo mesmo motivo de `InformeNaoDisponivel`."""
 
 
 def _somente_digitos(cnpj: str) -> str:
@@ -113,32 +129,53 @@ class CVMFundosProvider:
             (cnpj_fundo, data_competencia) crescente.
 
         Raises:
-            RuntimeError: mês sem arquivo publicado (HTTP 4xx) ou falha de rede
-                — erro explícito, nunca engolido.
+            InformeNaoDisponivel: mês sem arquivo publicado na fonte (HTTP 4xx).
+            RedeIndisponivel: falha de rede — a causa original segue encadeada.
+            ValueError: mês fora de 1-12 ou payload ilegível (ZIP sem entradas).
         """
         if not (1 <= mes <= 12):
             raise ValueError("Mês deve estar entre 1 e 12.")
 
-        zip_bytes = self._baixar_zip(ano, mes, usar_cache=usar_cache)
-        csv_bytes = self._extrair_csv(zip_bytes)
-        df = pd.read_csv(
-            io.BytesIO(csv_bytes),
-            sep=";",
-            encoding="latin-1",
-            dtype={"CNPJ_FUNDO_CLASSE": str},
-        )
-        df = df.rename(columns=COLUNAS_PT)
-
-        if "data_competencia" in df.columns:
-            df["data_competencia"] = pd.to_datetime(df["data_competencia"]).dt.date
+        # Frame mensal parseado é cacheado ALÉM do ZIP: em cache hit o
+        # read_csv do informe integral (~11 MB) não roda de novo. A chave
+        # deriva da URL do mês e o TTL é o mesmo do arquivo cru; com
+        # usar_cache=False a leitura é pulada e o frame regravado — o
+        # re-download traz dado fresco para os dois caches.
+        url = self._url_mes(ano, mes)
+        chave_frame = f"{url}::df"
+        df_cache: pd.DataFrame | None = None
+        if usar_cache:
+            cached = cache.get(chave_frame)
+            if isinstance(cached, pd.DataFrame):
+                df_cache = cached
+        if df_cache is None:
+            zip_bytes = self._baixar_zip(ano, mes, usar_cache=usar_cache)
+            csv_bytes = self._extrair_csv(zip_bytes)
+            df_cache = pd.read_csv(
+                io.BytesIO(csv_bytes),
+                sep=";",
+                encoding="latin-1",
+                dtype={"CNPJ_FUNDO_CLASSE": str},
+            )
+            df_cache = df_cache.rename(columns=COLUNAS_PT)
+            if "data_competencia" in df_cache.columns:
+                df_cache["data_competencia"] = pd.to_datetime(df_cache["data_competencia"]).dt.date
+            # Contrato de série: ordenação garantida pelo provider, não
+            # herdada da ordem do arquivo da fonte — o frame entra no cache
+            # já ordenado.
+            df_cache = df_cache.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(
+                drop=True
+            )
+            cache.set(chave_frame, df_cache, ttl=self.ttl)
+        df = df_cache
 
         if cnpj:
+            # Filtro vetorizado (operações str do pandas), igualdade
+            # normalizada por dígitos — sem lambda por linha.
             cnpj_alvo = _somente_digitos(cnpj)
-            df = df[df["cnpj_fundo"].map(lambda v: _somente_digitos(str(v)) == cnpj_alvo)]
-
-        # Contrato de série: ordenação garantida pelo provider, não herdada da
-        # ordem do arquivo da fonte.
-        return df.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(drop=True)
+            mascara = df["cnpj_fundo"].astype(str).str.replace(r"\D", "", regex=True) == cnpj_alvo
+            df = df[mascara].reset_index(drop=True)
+        return df
 
     def historico_fundo(
         self,
@@ -153,10 +190,11 @@ class CVMFundosProvider:
         ordenada por ``data_competencia`` crescente.
 
         Raises:
-            RuntimeError: qualquer mês do intervalo sem arquivo publicado ou
-                com falha de rede — erro explícito propagado: nada de
-                engolir exceção; um buraco silencioso na série viraria número
-                errado a jusante).
+            InformeNaoDisponivel: qualquer mês do intervalo sem arquivo
+                publicado na fonte (HTTP 4xx) — erro explícito propagado:
+                nada de engolir exceção; um buraco silencioso na série
+                viraria número errado a jusante.
+            RedeIndisponivel: falha de rede em qualquer mês do intervalo.
         """
         if inicio > fim:
             raise ValueError("Data inicial deve ser anterior à final.")
@@ -222,10 +260,17 @@ class CVMFundosProvider:
             )
             resp.raise_for_status()
         except requests.RequestException as erro:
-            raise RuntimeError(
-                f"Falha ao obter o informe diário da CVM para {mes:02d}/{ano} "
-                f"({url}): o mês pode ainda não ter sido publicado ou a rede "
-                f"está indisponível. Detalhe: {erro}"
+            # HTTP 4xx é domínio (mês sem arquivo publicado); o resto é rede.
+            # O raise_for_status real do requests anexa a resposta ao HTTPError.
+            status = getattr(getattr(erro, "response", None), "status_code", None)
+            if isinstance(status, int) and 400 <= status < 500:
+                raise InformeNaoDisponivel(
+                    f"O informe diário da CVM para {mes:02d}/{ano} não está "
+                    f"disponível na fonte ({url}): o mês pode ainda não ter "
+                    f"sido publicado (a publicação é D+1)."
+                ) from erro
+            raise RedeIndisponivel(
+                f"Falha ao obter o informe diário da CVM para {mes:02d}/{ano} ({url}): {erro}"
             ) from erro
 
         conteudo = resp.content

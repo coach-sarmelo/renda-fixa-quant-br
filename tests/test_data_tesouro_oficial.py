@@ -136,6 +136,33 @@ def provider_real(monkeypatch, cache_isolado) -> TesouroOficialProvider:
     return TesouroOficialProvider()
 
 
+def test_frame_parseado_cacheado_alem_do_texto(monkeypatch, cache_isolado) -> None:
+    """Cache de frame além do texto cru: a 2ª chamada não re-parseia o CSV
+    (parse 1×) nem re-baixa (HTTP 1×) — e devolve o mesmo conteúdo."""
+    parses = {"n": 0}
+    parsear_original = TesouroOficialProvider._parsear
+
+    def parsear_contado(texto: str) -> pd.DataFrame:
+        parses["n"] += 1
+        return parsear_original(texto)
+
+    monkeypatch.setattr(TesouroOficialProvider, "_parsear", staticmethod(parsear_contado))
+    downloads = {"n": 0}
+
+    def get_fake(*args, **kwargs):
+        downloads["n"] += 1
+        return RespostaFake({}, texto=CSV_SINTETICO)
+
+    monkeypatch.setattr(requests, "get", get_fake)
+    provider = TesouroOficialProvider()
+    df1 = provider.titulos_disponiveis()
+    df2 = provider.titulos_disponiveis()
+    assert downloads["n"] == 1
+    assert parses["n"] == 1
+    assert len(df2) == 2
+    assert df1.equals(df2)
+
+
 def test_fixture_real_tem_cabecalho_de_auditoria() -> None:
     """Cabeçalho de auditoria: path, data de captura e versão no próprio arquivo."""
     linhas = CAMINHO_FIXTURE_REAL.read_text(encoding="utf-8").splitlines()

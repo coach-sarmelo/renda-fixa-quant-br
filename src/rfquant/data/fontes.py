@@ -1,16 +1,17 @@
-"""Resolvedor declarado de fontes de dados — mapa fixo dado→provider.
+"""Resolvedor declarado de fontes de dados — mapa fixo dado→(provider, rótulo).
 
 O mapa abaixo é uma declaração, não uma escolha: cada tipo de dado tem
-exatamente uma fonte canônica. Não é seleção dinâmica e não existe cadeia
-de fallback em runtime — a fonte é decidida uma única vez por execução e,
-se falhar, o erro sobe tratado (mensagem pt-BR + exit ≠ 0 na CLI); nunca
-há troca de fonte no meio do caminho.
+exatamente uma fonte canônica, com o rótulo do anúncio na MESMA entrada.
+Não é seleção dinâmica e não existe cadeia de fallback em runtime — a
+fonte é decidida uma única vez por execução e, se falhar, o erro sobe
+tratado (mensagem pt-BR + exit ≠ 0 na CLI); nunca há troca de fonte no
+meio do caminho.
 
-Mapa declarado (dado → provider):
+Mapa declarado (dado → provider, rótulo do anúncio "fonte: <rótulo>"):
 
-    titulos → TesouroOficialProvider  (CSV oficial do Tesouro Direto, sem token)
-    cdi     → SGSProvider             (SGS/BCB, série 12 — CDI diário)
-    fundos  → CVMFundosProvider       (informes diários de fundos da CVM)
+    titulos → TesouroOficialProvider  ("oficial")  — CSV oficial do Tesouro Direto, sem token
+    cdi     → SGSProvider             ("sgs")      — SGS/BCB, série 12 — CDI diário
+    fundos  → CVMFundosProvider       ("cvm")      — informes diários de fundos da CVM
 
 O provider brapi (``rfquant.data.tesouro_direto``) fica FORA do mapa:
 depende de ``BRAPI_TOKEN`` e só é usado quando o usuário fixa a fonte na
@@ -22,30 +23,43 @@ determinística: o mesmo dado resolve para a mesma fonte com ou sem
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal, overload
 
 from rfquant.data.cvm_fundos import CVMFundosProvider
 from rfquant.data.sgs_bcb import SGSProvider
 from rfquant.data.tesouro_oficial import TesouroOficialProvider
 
-# Mapa declarado: dado → provider. Fixo e determinístico — a resolução é
-# uma busca por chave; não há preferências, tentativa-e-erro nem segunda
-# opção caso a fonte declarada falhe.
-MAPA_FONTES: dict[str, type] = {
-    "titulos": TesouroOficialProvider,
-    "cdi": SGSProvider,
-    "fundos": CVMFundosProvider,
+# União fechada dos providers com fonte declarada — o retorno de
+# `provider_do_dado` nunca é um Any: a fronteira CLI↔data fica checada
+# estaticamente (mypy) e as sobrecargas abaixo dão a classe exata de cada
+# dado no ponto de chamada.
+ProviderDeclarado = TesouroOficialProvider | SGSProvider | CVMFundosProvider
+
+# Mapa declarado: dado → (provider, rótulo do anúncio). Fixo e
+# determinístico — a resolução é uma busca por chave; não há preferências,
+# tentativa-e-erro nem segunda opção caso a fonte declarada falhe. Provider
+# e rótulo vivem na MESMA entrada: não há mapas paralelos para manter em
+# sincronia.
+MAPA_FONTES: dict[str, tuple[type[ProviderDeclarado], str]] = {
+    "titulos": (TesouroOficialProvider, "oficial"),
+    "cdi": (SGSProvider, "sgs"),
+    "fundos": (CVMFundosProvider, "cvm"),
 }
 
-# Rótulo de anúncio de cada fonte na saída da CLI ("fonte: <rótulo>").
-_ROTULOS: dict[type, str] = {
-    TesouroOficialProvider: "oficial",
-    SGSProvider: "sgs",
-    CVMFundosProvider: "cvm",
-}
+
+@overload
+def provider_do_dado(dado: Literal["titulos"]) -> TesouroOficialProvider: ...
 
 
-def provider_do_dado(dado: str) -> Any:
+@overload
+def provider_do_dado(dado: Literal["cdi"]) -> SGSProvider: ...
+
+
+@overload
+def provider_do_dado(dado: Literal["fundos"]) -> CVMFundosProvider: ...
+
+
+def provider_do_dado(dado: str) -> ProviderDeclarado:
     """Instancia a fonte declarada no mapa para o dado informado.
 
     Resolução automática (``--fonte=auto``): puramente tabular — não
@@ -54,7 +68,7 @@ def provider_do_dado(dado: str) -> Any:
     explícita, nunca fallback silencioso para outra fonte.
     """
     try:
-        fabrica = MAPA_FONTES[dado]
+        fabrica, _ = MAPA_FONTES[dado]
     except KeyError:
         declaradas = ", ".join(sorted(MAPA_FONTES))
         msg = f"Sem fonte declarada para o dado '{dado}' (declaradas: {declaradas})."
@@ -62,14 +76,14 @@ def provider_do_dado(dado: str) -> Any:
     return fabrica()
 
 
-def rotulo_do_provider(provider: Any) -> str:
+def rotulo_do_provider(provider: ProviderDeclarado) -> str:
     """Rótulo da fonte resolvida, para o anúncio na saída ("fonte: <rótulo>").
 
     Provider fora do conjunto declarado ⇒ ``ValueError`` — o anúncio nunca
     inventa nome de fonte.
     """
-    try:
-        return _ROTULOS[type(provider)]
-    except KeyError:
-        msg = f"Sem rótulo de fonte declarado para {type(provider).__name__}."
-        raise ValueError(msg) from None
+    for fabrica, rotulo in MAPA_FONTES.values():
+        if type(provider) is fabrica:
+            return rotulo
+    msg = f"Sem rótulo de fonte declarado para {type(provider).__name__}."
+    raise ValueError(msg)

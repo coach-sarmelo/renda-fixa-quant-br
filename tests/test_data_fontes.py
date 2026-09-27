@@ -24,11 +24,15 @@ from rfquant.data.tesouro_oficial import TesouroOficialProvider
 # ----------------------------------------------------------------------
 # Mapa declarado: entradas fixadas como contrato
 # ----------------------------------------------------------------------
-def test_mapa_declarado_fixa_a_fonte_de_cada_dado() -> None:
-    """Uma fonte canônica por dado: títulos → oficial; CDI → SGS; fundos → CVM."""
-    assert MAPA_FONTES["titulos"] is TesouroOficialProvider
-    assert MAPA_FONTES["cdi"] is SGSProvider
-    assert MAPA_FONTES["fundos"] is CVMFundosProvider
+def test_mapa_declarado_fixa_a_fonte_e_o_rotulo_de_cada_dado() -> None:
+    """Uma fonte canônica por dado, com o rótulo do anúncio na MESMA entrada:
+    títulos → oficial; CDI → sgs; fundos → cvm."""
+    assert MAPA_FONTES["titulos"][0] is TesouroOficialProvider
+    assert MAPA_FONTES["cdi"][0] is SGSProvider
+    assert MAPA_FONTES["fundos"][0] is CVMFundosProvider
+    assert MAPA_FONTES["titulos"][1] == "oficial"
+    assert MAPA_FONTES["cdi"][1] == "sgs"
+    assert MAPA_FONTES["fundos"][1] == "cvm"
     assert len(MAPA_FONTES) == 3  # sem entradas além das declaradas
 
 
@@ -36,7 +40,7 @@ def test_brapi_fica_fora_do_mapa() -> None:
     """O provider brapi não participa da resolução automática: só é usado
     quando o usuário fixa a fonte explicitamente (--fonte=brapi na CLI)."""
     assert "brapi" not in MAPA_FONTES
-    assert TesouroDiretoProvider not in MAPA_FONTES.values()
+    assert all(fabrica is not TesouroDiretoProvider for fabrica, _ in MAPA_FONTES.values())
 
 
 # ----------------------------------------------------------------------
@@ -74,6 +78,13 @@ def test_dado_fora_do_mapa_levanta_erro_ptbr() -> None:
         provider_do_dado("cotacoes")
     assert "cotacoes" in str(erro.value)
     assert "titulos" in str(erro.value)  # as declaradas acompanham a mensagem
+
+
+def test_rotulo_vive_na_mesma_entrada_do_provider() -> None:
+    """O rótulo anunciado sai da MESMA entrada do mapa que instanciou o
+    provider — sem mapas paralelos para dessincronizar."""
+    for fabrica, rotulo in MAPA_FONTES.values():
+        assert rotulo_do_provider(fabrica()) == rotulo
 
 
 def test_rotulo_do_provider_para_o_anuncio_da_fonte() -> None:

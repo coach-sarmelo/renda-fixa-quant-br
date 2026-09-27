@@ -13,7 +13,9 @@ sem autenticação. Taxas em % a.a. — convertidas para fração
 
 O arquivo inteiro é baixado no máximo 1×/24 h via ``rfquant.data.cache``
 (diskcache/SQLite) e o parsing filtra a ``Data Base`` de interesse —
-requisito de cache local (ver docs/dados.md).
+requisito de cache local (ver docs/dados.md). O frame PARSEADO também é
+cacheado (mesmo TTL) — o ``read_csv`` de ~14,5 MB roda no cache miss, não
+a cada chamada.
 """
 
 from __future__ import annotations
@@ -89,14 +91,24 @@ class TesouroOficialProvider(DataProvider):
     # Internos
     # ------------------------------------------------------------------
     def _ler_csv(self) -> pd.DataFrame:
-        cached: str | None = cache.get(self.url)
-        if cached is not None:
-            return self._parsear(cached)
-        resp = requests.get(self.url, timeout=120)
-        resp.raise_for_status()
-        texto = resp.text
-        cache.set(self.url, texto, ttl=self.ttl)
-        return self._parsear(texto)
+        # Frame parseado é cacheado ALÉM do texto cru: em cache hit o
+        # read_csv do arquivo integral (~14,5 MB) não roda de novo. Mesma
+        # TTL do CSV — texto e frame expiram juntos.
+        chave_frame = f"{self.url}::df"
+        df_cache: pd.DataFrame | None = None
+        cached_frame = cache.get(chave_frame)
+        if isinstance(cached_frame, pd.DataFrame):
+            df_cache = cached_frame
+        if df_cache is None:
+            texto: str | None = cache.get(self.url)
+            if texto is None:
+                resp = requests.get(self.url, timeout=120)
+                resp.raise_for_status()
+                texto = resp.text
+                cache.set(self.url, texto, ttl=self.ttl)
+            df_cache = self._parsear(texto)
+            cache.set(chave_frame, df_cache, ttl=self.ttl)
+        return df_cache
 
     @staticmethod
     def _parsear(texto: str) -> pd.DataFrame:
