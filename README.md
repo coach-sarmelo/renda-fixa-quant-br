@@ -56,6 +56,15 @@ rfq comparar --cdb 12.0 --lci 10.5 --tesouro 11.8 --prazo 720
 
 # 4) Resumo rápido do Tesouro Direto de hoje (fonte oficial)
 rfq hoje
+
+# 5) Listar títulos com a fonte resolvida automaticamente (a CLI anuncia "fonte: oficial")
+rfq tesouro listar --fonte=auto
+
+# 6) Comparar CDB a 110% do CDI com o CDI real da série SGS/BCB (sem token)
+rfq comparar --cdb-cdi 110 --cdi-auto --prazo 720
+
+# 7) Resumo de um fundo de investimento no mês (troque pelo CNPJ real; informe da CVM, sem token)
+rfq fundos resumo --cnpj 00.000.000/0000-00 --mes 2026-08
 ```
 
 Exemplo de saída do `precificar` (a data de referência é sempre a data atual):
@@ -67,10 +76,12 @@ Duration Mod:   6.3334
 Current Yield:  5.9187%
 ```
 
-> **Sobre a opção `--fonte`:** o valor padrão é `brapi`, que hoje **não é
-> utilizável** — o endpoint de renda fixa da brapi exige plano pago e a CLI
-> falha sem `BRAPI_TOKEN`. Passe sempre `--fonte=oficial` (sem token, sem
-> cadastro). A integração brapi permanece como plano futuro; detalhes em
+> **Sobre a opção `--fonte`:** o valor padrão é `auto` — um mapa declarado
+> resolve cada dado pela sua fonte oficial (títulos → Tesouro Transparente;
+> CDI → série SGS/BCB; fundos → CVM) e a CLI anuncia a fonte usada ("fonte:
+> oficial"). `--fonte=oficial` continua disponível. `--fonte=brapi` hoje
+> **não é utilizável** (exige plano pago e falha sem `BRAPI_TOKEN`) — a
+> resolução automática nunca o escolhe. Detalhes em
 > [Fontes de dados](docs/dados.md).
 
 ## Configuração (`.env`)

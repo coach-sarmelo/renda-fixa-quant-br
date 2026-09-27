@@ -111,18 +111,44 @@ requer token nem assinatura. A integração brapi permanece registrada apenas
 como **plano futuro** — se um dia for ativada, exigirá plano pago e será
 documentada aqui.
 
+## Fundos de Investimento (CVM)
+
+- **URL:** https://dados.cvm.gov.br/dataset/fi-doc-inf_diario
+- **Paths padrão:** informe mensal em `/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_YYYYMM.zip`; cadastro de fundos em `/dados/FI/CAD/DADOS/cad_fi.csv` (arquivo único; ainda não consumido pelo provider)
+- **Tamanho medido (captura de 2026-09-23):** informe mensal ~11 MB/mês; cadastro `cad_fi.csv` ~17,1 MB
+- **Formato:** ZIP → CSV (`;`, latin-1) no layout vigente de classes/subclasses da RCVM 175
+- **Cobertura:** informes diários de fundos (cota, patrimônio líquido, captações, resgates, cotistas)
+- **Janela:** últimos 12 meses + históricos anteriores
+- **Cadência:** diária (D+1) — o ZIP mensal é atualizado a cada dia útil intramês e congela no fechamento do mês
+- **Autenticação:** nenhuma
+
+### Uso na CLI
+
+```bash
+rfq fundos resumo --cnpj 00.000.000/0000-00 --mes 2026-08
+```
+
+Resume a rentabilidade do fundo no mês em três números — acumulada do
+período, anualizada (base 252, dias úteis do calendário real) e expressa
+em % do CDI da mesma janela — direto do informe oficial da CVM, sem
+token. O download do ZIP do mês (~11 MB) cai no cache em disco com TTL
+de 24 h.
+
 ## Indicadores macro (BCB SGS) — referência externa
 
 - **BCB (SGS):** [https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados](https://api.bcb.gov.br/dados/serie/bcdata.sgs.%7Bcodigo%7D/dados) — séries como Selic meta (432), CDI e IPCA, JSON sem autenticação.
 
-Integrar essas séries como providers da ferramenta está no radar (ver
-"Próximos passos"). Hoje elas não são consumidas pelo `rfquant`.
+O `rfquant` já consome o CDI (série 12 do SGS, % ao dia) nos comandos
+`comparar --cdi-auto` e `fundos resumo`; as demais séries (Selic meta,
+IPCA) seguem apenas como referência externa, no radar de integração (ver
+"Próximos passos").
 
 ## Limitações conhecidas
 
 | Fonte / cálculo | Limitação |
 |---|---|
 | brapi (conta gratuita) | Endpoint de renda fixa exige plano Pro (403 em conta gratuita) — integração é plano futuro; use `--fonte=oficial` |
+| CVM (CSV) | Arquivos grandes: informe mensal ~11 MB/mês e cadastro `cad_fi.csv` ~17,1 MB — baixados sob demanda, com cache em disco (TTL 24 h) |
 | Debêntures | Não há API pública consolidada (ANBIMA requer assinatura) |
 | CDB / LCI / LCA | Não há API centralizada; o usuário informa as taxas |
 | Núcleo de pricing vs Tesouro | Dias úteis por D6 (252/365): erro do PU vs oficial cresce com o prazo — 5,11e-4 a 4,80e-3 nos 5 LTNs da data-base 30/06/2026 (seção "Limitação medida da aproximação D6"); calendário real de feriados está no radar |
@@ -130,7 +156,7 @@ Integrar essas séries como providers da ferramenta está no radar (ver
 ## Próximos passos
 
 - [ ] Calendário brasileiro real de feriados para dias úteis exatos (remove a limitação D6)
-- [ ] Séries macro (Selic/CDI/IPCA) via SGS/BCB como providers
+- [ ] Demais séries macro (Selic meta, IPCA) via SGS/BCB como providers
 - [ ] Scraper do portal do Tesouro Direto como **fonte contingencial — planejada, não implementada** (só seria acionada se o CSV oficial deixasse de funcionar)
 - [ ] Integração com ANBIMA para debêntures
 - [ ] Adapter para OpenBB (`openbb-br` provider)
