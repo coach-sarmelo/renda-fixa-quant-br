@@ -46,7 +46,7 @@ from datetime import date
 import pandas as pd
 import pytest
 import requests
-from conftest import FIXTURE_ZIP, _RespostaErro, _RespostaZip
+from conftest import FIXTURE_ZIP, RespostaErro, RespostaZip
 
 from rfquant.data.cvm_fundos import (
     CVM_BASE_URL,
@@ -122,8 +122,8 @@ class _FetchCVM:
         if self._cenario == "rede_cai":
             raise requests.ConnectionError("falha de conexão simulada")
         if self._cenario == "mes_ausente":
-            return _RespostaErro()
-        return _RespostaZip(self._conteudo)
+            return RespostaErro()
+        return RespostaZip(self._conteudo)
 
 
 @pytest.fixture

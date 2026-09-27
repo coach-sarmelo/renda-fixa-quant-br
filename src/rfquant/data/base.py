@@ -36,7 +36,7 @@ CATEGORIAS: tuple[str, ...] = (
 class Titulo(BaseModel):
     """Representação normalizada de um título de renda fixa.
 
-    Modelo canônico de produto (ratificado em 2026-09-23): ProdutoRF
+    Modelo canônico de produto: ProdutoRF
     (comparison/taxa_equivalente.py) e a dataclass do núcleo de ranking
     (fora do pacote público) são views derivadas, convertidas
     exclusivamente via de_titulo(). O prazo de análise não vive aqui — é

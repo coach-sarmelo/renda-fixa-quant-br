@@ -45,7 +45,7 @@ class RespostaFake:
         return self._payload
 
 
-def _fixture_payload() -> list[dict[str, str]]:
+def fixture_payload() -> list[dict[str, str]]:
     """Conteúdo JSON da fixture real do SGS (série 12 — CDI diário), sem as
     linhas de cabeçalho ``#``. Compartilhada pelos testes do provider e da
     CLI (``--cdi-auto`` e ``fundos resumo`` sem rede)."""
@@ -54,7 +54,7 @@ def _fixture_payload() -> list[dict[str, str]]:
     return json.loads(corpo)
 
 
-class _RespostaZip:
+class RespostaZip:
     """Resposta HTTP falsa: corpo é o ZIP da fixture da CVM (lido via
     ``content``). Compartilhada pelos testes do provider e de ``fundos resumo``."""
 
@@ -65,7 +65,7 @@ class _RespostaZip:
         return None
 
 
-class _RespostaErro:
+class RespostaErro:
     """Resposta HTTP falsa que falha no ``raise_for_status`` (mês sem arquivo)."""
 
     def raise_for_status(self) -> None:

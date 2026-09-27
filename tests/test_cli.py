@@ -16,7 +16,7 @@ from datetime import date
 
 import pytest
 import requests
-from conftest import FIXTURE_ZIP, RespostaFake, _fixture_payload, _RespostaErro, _RespostaZip
+from conftest import FIXTURE_ZIP, RespostaErro, RespostaFake, RespostaZip, fixture_payload
 from test_data_tesouro_oficial import _fixture_real
 from typer.testing import CliRunner
 
@@ -47,7 +47,7 @@ def http_fixture_real(monkeypatch, cache_isolado) -> None:
 def http_fixture_sgs(monkeypatch, cache_isolado) -> None:
     """GET do provider SGS/BCB responde com a fixture real (setembro/2026
     excisada); cache em tmp — `comparar --cdi-auto` sem rede."""
-    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaFake(_fixture_payload()))
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaFake(fixture_payload()))
     return None
 
 
@@ -59,8 +59,8 @@ def http_fixture_fundos(monkeypatch, cache_isolado) -> None:
 
     def get_fake(url, *args, **kwargs):
         if "dados.cvm.gov.br" in str(url):
-            return _RespostaZip(FIXTURE_ZIP.read_bytes())
-        return RespostaFake(_fixture_payload())
+            return RespostaZip(FIXTURE_ZIP.read_bytes())
+        return RespostaFake(fixture_payload())
 
     monkeypatch.setattr(requests, "get", get_fake)
     return None
@@ -490,7 +490,7 @@ def test_fundos_resumo_aceita_cnpj_sem_pontuacao(http_fixture_fundos) -> None:
 def test_fundos_resumo_mes_ausente_erro_ptbr(monkeypatch, cache_isolado) -> None:
     """Mês sem arquivo publicado (HTTP 404): falha de rede tratada pt-BR +
     exit 1, com dica acionável e sem traceback cru (SystemExit no runner)."""
-    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: _RespostaErro())
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: RespostaErro())
     resultado = runner.invoke(
         app, ["fundos", "resumo", "--cnpj", "00.017.024/0001-53", "--mes", "2099-08"]
     )

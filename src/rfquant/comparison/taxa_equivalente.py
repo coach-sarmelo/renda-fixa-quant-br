@@ -120,11 +120,11 @@ def ipca_mais_para_pre(ipca_mais: float, ipca_esperado: float) -> float:
 class ProdutoRF:
     """View derivada de um produto para comparação.
 
-    Modelo canônico: `Titulo` (data/base.py) — decisão registrada na
-    ratificação do modelo único de produto (2026-09-23). Esta dataclass é a
-    view mínima do núcleo de comparação; o único ponto de conversão é
-    `de_titulo()`. O núcleo segue recebendo a dataclass pequena para
-    preservar as assinaturas ratificadas de `taxa_liquida_anual`/`comparar`.
+    Modelo canônico: `Titulo` (data/base.py), a dataclass do núcleo de
+    dados. Esta dataclass é a view mínima do núcleo de comparação; o único
+    ponto de conversão é `de_titulo()`. O núcleo segue recebendo a
+    dataclass pequena para preservar as assinaturas vigentes de
+    `taxa_liquida_anual`/`comparar`.
     """
 
     nome: str
@@ -189,7 +189,7 @@ def taxa_liquida_anual(produto: ProdutoRF) -> float:
     acumulado anualizado. Aplica apenas o IR.
 
     Default de `comparar` e do CLI: a linear não muda silenciosamente
-    os contratos já ratificados; o ranking usa a composta.
+    os contratos do núcleo; o ranking usa a composta.
     """
     aliq = 0.0 if produto.isento else ir.aliquota(produto.prazo_dias)
     return produto.taxa_anual * (1 - aliq)
@@ -243,8 +243,8 @@ def taxa_liquida_anual_composta(produto: ProdutoRF) -> float:
 def comparar(produtos: list[ProdutoRF]) -> list[ResultadoComparacao]:
     """Compara produtos por taxa líquida anual (decrescente).
 
-    Default linear: o comparar e o CLI mantêm a convenção linear
-    ratificada; a variante composta é o default do ranking.
+    Default linear: o comparar e o CLI mantêm a convenção linear;
+    a variante composta é o default do ranking.
     """
     resultados: list[ResultadoComparacao] = []
     for p in produtos:

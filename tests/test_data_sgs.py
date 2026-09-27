@@ -16,7 +16,7 @@ from typing import Any
 import pandas as pd
 import pytest
 import requests
-from conftest import CAMINHO_FIXTURE_SGS, RespostaFake, _fixture_payload
+from conftest import CAMINHO_FIXTURE_SGS, RespostaFake, fixture_payload
 
 from rfquant.data.sgs_bcb import TTL_SGS, USER_AGENT, SGSProvider
 
@@ -54,7 +54,7 @@ def provider_sgs(cache_isolado) -> SGSProvider:
 @pytest.fixture
 def fetch_sgs_fixture(monkeypatch, cache_isolado) -> _FetchContadoSGS:
     """Fetch instrumentado devolvendo a fixture REAL (setembro/2026 excisado)."""
-    fetch = _FetchContadoSGS(_fixture_payload())
+    fetch = _FetchContadoSGS(fixture_payload())
     monkeypatch.setattr(requests, "get", fetch)
     return fetch
 
@@ -95,7 +95,7 @@ def test_parse_fixture_real_datas_date_e_valores_float(provider_sgs, fetch_sgs_f
     o primeiro registro e a virada de taxa em 17/09 (0,051660 → 0,050788 ao
     dia) batem com os valores verificados no endpoint na captura.
     """
-    bruto = _fixture_payload()
+    bruto = fixture_payload()
     df = provider_sgs.serie_diaria(date(2026, 9, 1), date(2026, 9, 30))
 
     primeiro = df.iloc[0]
