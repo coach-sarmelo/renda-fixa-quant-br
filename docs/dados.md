@@ -38,10 +38,12 @@ rfq tesouro listar --fonte=oficial --tipo IPCA+    # filtro por tipo
 rfq hoje                                           # resumo do dia
 ```
 
-> **Atenção:** o valor padrão de `--fonte` é `brapi`. Sem `BRAPI_TOKEN` a
-> CLI falha com mensagem explícita (exit 1) — não há substituição
-> silenciosa de fonte. Como o endpoint de renda fixa da brapi hoje exige
-> plano pago (abaixo), use sempre `--fonte=oficial`.
+> **Atenção:** o valor padrão de `--fonte` é `auto` — mapa declarado em
+> `rfquant.data.fontes`: títulos pela fonte oficial do Tesouro, CDI pela
+> série 12 do SGS/BCB e fundos pelo informe diário da CVM, com a fonte
+> usada anunciada na saída. O pino `--fonte=brapi` existe para
+> reprodutibilidade e exige `BRAPI_TOKEN`: sem o token a CLI falha com
+> mensagem explícita (exit 1) — não há substituição silenciosa de fonte.
 
 ### Fixture de regressão com valores oficiais
 
