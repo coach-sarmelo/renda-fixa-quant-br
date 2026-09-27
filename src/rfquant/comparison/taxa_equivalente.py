@@ -214,8 +214,8 @@ def liquida_composta(
 
     Escalares (não ProdutoRF) porque dois núcleos de dataclasses
     distintos a consomem: `taxa_liquida_anual_composta` (view de
-    comparação) e `ranking.ranquear` (view de ranking). `nome` só
-    qualifica as mensagens de erro.
+    comparação) e o núcleo de ranking (view de ranking, fora do pacote
+    público). `nome` só qualifica as mensagens de erro.
     """
     if prazo_dias <= 0:
         raise ValueError(f"Prazo inválido para '{nome}': {prazo_dias} d.")
@@ -234,8 +234,8 @@ def taxa_liquida_anual_composta(produto: ProdutoRF) -> float:
     """Calcula a taxa anual líquida na convenção composta, exata para
     horizonte t != 1 ano (fórmula e guardas em `liquida_composta`).
 
-    Default do ranking: o horizonte do candidato é conhecido lá;
-    `comparar` e o CLI permanecem lineares.
+    Default do núcleo de ranking (fora do pacote público): o horizonte
+    do candidato é conhecido lá; `comparar` e o CLI permanecem lineares.
     """
     return liquida_composta(produto.taxa_anual, produto.prazo_dias, produto.isento, produto.nome)
 

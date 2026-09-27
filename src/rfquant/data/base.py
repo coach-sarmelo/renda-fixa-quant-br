@@ -37,9 +37,10 @@ class Titulo(BaseModel):
     """Representação normalizada de um título de renda fixa.
 
     Modelo canônico de produto (ratificado em 2026-09-23): ProdutoRF
-    (comparison/taxa_equivalente.py) e TituloRanking (comparison/ranking.py)
-    são views derivadas, convertidas exclusivamente via de_titulo(). O prazo
-    de análise não vive aqui — é da análise, não do produto.
+    (comparison/taxa_equivalente.py) e a dataclass do núcleo de ranking
+    (fora do pacote público) são views derivadas, convertidas
+    exclusivamente via de_titulo(). O prazo de análise não vive aqui — é
+    da análise, não do produto.
     """
 
     nome: str = Field(..., description="Ex: 'Tesouro IPCA+ 2035'")

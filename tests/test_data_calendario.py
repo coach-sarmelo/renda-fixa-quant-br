@@ -75,23 +75,26 @@ def test_du_derivado_do_pu_oficial_bate_a_zero(
 
 
 # ----------------------------------------------------------------------
-# Guardas de convenção (nada de volta à aproximação D6)
+# Guardas de convenção (nada de volta à aproximação dias corridos × 252/365)
 # ----------------------------------------------------------------------
-def test_nao_e_mais_a_aproximacao_d6() -> None:
-    """Guarda anti-regressão: o DU real difere da aproximação D6 (dc×252/365).
+def test_nao_e_mais_a_aproximacao_252_sobre_365() -> None:
+    """Guarda anti-regressão: o DU real difere da aproximação dias corridos
+    × 252/365.
 
-    Caso 30/06/2026 → 01/01/2032: D6 daria round(2011 × 252/365) = 1388; o du
-    real publicado é 1379 (docs/dados.md:72-78) — eram os 9 DU de desvio que a
-    aproximação deixava passar. Se isto falhar, o núcleo voltou à aproximação.
+    Caso 30/06/2026 → 01/01/2032: a aproximação daria round(2011 × 252/365)
+    = 1388; o du real publicado é 1379 (docs/dados.md:72-78) — eram os 9 DU
+    de desvio que a aproximação deixava passar. Se isto falhar, o núcleo
+    voltou à aproximação.
     """
-    du_d6 = round((date(2032, 1, 1) - DATA_BASE_PUBLICADO).days * 252 / 365)
+    du_aproximado = round((date(2032, 1, 1) - DATA_BASE_PUBLICADO).days * 252 / 365)
     assert calendario.dias_uteis(DATA_BASE_PUBLICADO, date(2032, 1, 1)) == 1379
-    assert du_d6 == 1388
+    assert du_aproximado == 1388
 
 
 def test_pu_dias_uteis_delega_no_calendario_real() -> None:
     """Assinatura pública de ``pu.dias_uteis`` preservada e delegando no
-    calendário real (a aproximação D6 não é mais usada no núcleo)."""
+    calendário real (a aproximação dias corridos × 252/365 não é mais usada
+    no núcleo)."""
     assert pu.dias_uteis(DATA_BASE_PUBLICADO, date(2032, 1, 1)) == 1379
     assert pu.dias_uteis(DATA_BASE_PUBLICADO, date(2032, 1, 1)) == calendario.dias_uteis(
         DATA_BASE_PUBLICADO, date(2032, 1, 1)
@@ -99,7 +102,8 @@ def test_pu_dias_uteis_delega_no_calendario_real() -> None:
 
 
 def test_intervalo_vazio_ou_invertido_devolve_zero() -> None:
-    """``fim <= inicio`` ⇒ 0 (comportamento público preservado da D6)."""
+    """``fim <= inicio`` ⇒ 0 (comportamento público preservado da aproximação
+    dias corridos × 252/365)."""
     d = date(2026, 6, 30)
     assert calendario.dias_uteis(d, d) == 0
     assert calendario.dias_uteis(date(2027, 1, 1), d) == 0
