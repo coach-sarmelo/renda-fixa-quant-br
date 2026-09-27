@@ -46,7 +46,7 @@ jobs:
   # Suíte @pytest.mark.network: só no gatilho semanal — nunca no CI de PR
   # (rede não é gate de merge; o `if` do job é quem isola o PR). Cobertura
   # §13.7: Tesouro Oficial (~14,5 MB — docs/dados.md:15), CVM informe diário
-  # (~11 MB — sonda §7.4/S1) e SGS série 12 (JSON pequeno, sem auth).
+  # (~11 MB) e SGS série 12 (JSON pequeno, sem auth).
   network:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
@@ -100,3 +100,8 @@ jobs:
       # relatorio.py ou no cli.py); sem isto, o contrato fecha por sorte
       - name: Nenhum import de openai
         run: "! grep -rn 'import openai' src/rfquant/ --include='*.py'"
+      # A varredura acima é na árvore inteira de src/rfquant/ — cobre os
+      # módulos novos do relatório determinístico e da comparação/ordenação
+      # multi-produto — e é textual: pega import de openai mesmo quando
+      # tardio, dentro de função. Qualquer módulo novo nasce coberto.
+
