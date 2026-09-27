@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import date
 from pathlib import Path
@@ -15,6 +16,8 @@ from rfquant.data import cache
 from rfquant.data.tesouro_direto import TesouroDiretoProvider
 
 CAMINHO_SAMPLE = Path(__file__).parent / "fixtures" / "tesouro_sample.csv"
+FIXTURE_ZIP = Path(__file__).parent / "fixtures" / "cvm_informe_sample.zip"
+CAMINHO_FIXTURE_SGS = Path(__file__).parent / "fixtures" / "sgs_serie12_sample.json"
 
 
 @pytest.fixture
@@ -40,6 +43,33 @@ class RespostaFake:
 
     def json(self) -> dict:
         return self._payload
+
+
+def _fixture_payload() -> list[dict[str, str]]:
+    """Conteúdo JSON da fixture real do SGS (série 12 — CDI diário), sem as
+    linhas de cabeçalho ``#``. Compartilhada pelos testes do provider e da
+    CLI (``--cdi-auto`` e ``fundos resumo`` sem rede)."""
+    linhas = CAMINHO_FIXTURE_SGS.read_text(encoding="utf-8").splitlines()
+    corpo = "\n".join(linha for linha in linhas if not linha.startswith("#"))
+    return json.loads(corpo)
+
+
+class _RespostaZip:
+    """Resposta HTTP falsa: corpo é o ZIP da fixture da CVM (lido via
+    ``content``). Compartilhada pelos testes do provider e de ``fundos resumo``."""
+
+    def __init__(self, conteudo: bytes) -> None:
+        self.content = conteudo
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _RespostaErro:
+    """Resposta HTTP falsa que falha no ``raise_for_status`` (mês sem arquivo)."""
+
+    def raise_for_status(self) -> None:
+        raise requests.HTTPError("404 Client Error: Not Found for url: fake")
 
 
 @pytest.fixture

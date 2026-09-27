@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from rfquant.data.calendario import dias_uteis as _dias_uteis_calendario
 from rfquant.pricing.fluxo_caixa import Fluxo, gerar_fluxos
 
 # Número de dias úteis por ano (convenção do mercado brasileiro)
@@ -11,15 +12,16 @@ DU_ANO = 252
 
 
 def dias_uteis(inicio: date, fim: date) -> int:
-    """Estima dias úteis entre duas datas.
+    """Conta os dias úteis reais do calendário B3/SFN no intervalo ``(inicio, fim]``.
 
-    Nota: Aproximação simples (dias corridos × 252/365).
-    Para produção, usar feriados da B3 via biblioteca `businessdays`.
+    Delega ao calendário real (:mod:`rfquant.data.calendario`, via
+    ``pandas_market_calendars``).
+
+    Histórico: antes era a aproximação ``dias corridos × 252/365``, com
+    erro relativo de PU medido de 5,11e-4 a 4,80e-3 contra o oficial
+    (ver ``docs/dados.md``).
     """
-    if fim <= inicio:
-        return 0
-    dias_corridos = (fim - inicio).days
-    return max(round(dias_corridos * DU_ANO / 365), 1)
+    return _dias_uteis_calendario(inicio, fim)
 
 
 def calcular(

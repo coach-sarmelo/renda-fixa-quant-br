@@ -1,0 +1,26 @@
+# Fixture SINTÉTICA de série histórica — NÃO é captura real.
+# Consumidor: MockProvider.historico_taxas (tests/mock_provider.py), que descarta
+# as linhas iniciadas por "#" antes do pd.read_csv (o parser nunca vê comentário).
+# Documentação:
+#   origem: valores inventados à mão, plausíveis contra tests/fixtures/tesouro_sample.csv
+#     (Tesouro Selic 2029: taxa_compra 0.1150/taxa_venda 0.1165 e PU_compra 14.520,35 da
+#     linha de títulos; Tesouro Prefixado 2029: 0.1180/0.1200 e PU 7.850,42);
+#   data-base: dias úteis sintéticos de 2026-01-01 a 2026-01-12;
+#   critério: PU cresce ≈ taxa/252 ao dia (composição arredondada a 2 decimais;
+#     taxa_venda < taxa_compra não — PU_venda < PU_compra, taxa_venda > taxa_compra);
+#     última linha da Selic varia a taxa (0.1148/0.1163) para provar que a bateria
+#     não assume série constante;
+#   cadência: 1 registro por dia útil, 11 linhas (8 Selic + 3 Prefixado) —
+#     determinística, offline, alguns KBs.
+titulo,data,taxa_compra,taxa_venda,pu_compra,pu_venda
+Tesouro Selic 2029,2026-01-01,0.1150,0.1165,14520.35,14520.10
+Tesouro Selic 2029,2026-01-02,0.1150,0.1165,14526.98,14526.73
+Tesouro Selic 2029,2026-01-05,0.1150,0.1165,14533.61,14533.36
+Tesouro Selic 2029,2026-01-06,0.1150,0.1165,14540.25,14540.00
+Tesouro Selic 2029,2026-01-07,0.1150,0.1165,14546.88,14546.63
+Tesouro Selic 2029,2026-01-08,0.1150,0.1165,14553.52,14553.27
+Tesouro Selic 2029,2026-01-09,0.1150,0.1165,14560.17,14559.92
+Tesouro Selic 2029,2026-01-12,0.1148,0.1163,14566.83,14566.58
+Tesouro Prefixado 2029,2026-01-01,0.1180,0.1200,7850.42,7849.80
+Tesouro Prefixado 2029,2026-01-02,0.1180,0.1200,7854.10,7853.48
+Tesouro Prefixado 2029,2026-01-05,0.1180,0.1200,7857.78,7857.16

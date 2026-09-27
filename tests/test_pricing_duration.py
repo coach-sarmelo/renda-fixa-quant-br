@@ -6,11 +6,19 @@ from datetime import date
 
 import pytest
 
+from rfquant.data import calendario
 from rfquant.pricing import duration
+
+# Par de datas com exatamente 252 dias úteis do calendário real ('B3'):
+# o 252º dia útil após 05/01/2026 (segunda) é 08/01/2027 (sexta). Derivado com
+# rfquant.data.calendario.dias_uteis, cuja bateria (10 casos oficiais do
+# Tesouro, a ±0 em tests/test_data_calendario.py) valida a fonte.
+COMPRA_252_DU = date(2026, 1, 5)
+VENCIMENTO_252_DU = date(2027, 1, 8)
 
 
 def test_duration_zero_cupom_igual_prazo() -> None:
-    """Zero-cupom: D_mac = prazo em anos pela convenção D6 (du/252)."""
+    """Zero-cupom: D_mac = prazo em anos (du real do calendário / 252)."""
     compra, venc = date(2026, 1, 1), date(2031, 1, 1)
     d = duration.macaulay(
         data_compra=compra,
@@ -19,16 +27,18 @@ def test_duration_zero_cupom_igual_prazo() -> None:
         valor_nominal=1000.0,
         taxa_cupom_anual=0.0,
     )
-    du_esperado = round((venc - compra).days * 252 / 365)
+    du_esperado = calendario.dias_uteis(compra, venc)
     assert d == pytest.approx(du_esperado / 252, rel=1e-9)
 
 
 def test_macaulay_252du_um_exato() -> None:
-    """Zero-cupom com exatamente 252 DU (365 dc) ⇒ D_mac = 1,0
-    exato (tol 1e-12). Acoplado a D6."""
+    """Zero-cupom com prazo de exatamente 252 dias úteis do calendário
+    real ⇒ D_mac = 1,0 exato (tol 1e-12). Antes do calendário real o caso
+    usava 365 dias corridos pela aproximação ``dias corridos × 252/365`` —
+    substituída pelo calendário real."""
     d = duration.macaulay(
-        data_compra=date(2026, 1, 1),
-        data_vencimento=date(2027, 1, 1),
+        data_compra=COMPRA_252_DU,
+        data_vencimento=VENCIMENTO_252_DU,
         taxa_anual=0.10,
         valor_nominal=1000.0,
         taxa_cupom_anual=0.0,
@@ -37,10 +47,10 @@ def test_macaulay_252du_um_exato() -> None:
 
 
 def test_modificada_um_sobre_um_mais_y() -> None:
-    """Com 252 DU, D_mod = 1/(1+y) exato (tol 1e-12)."""
+    """Com 252 DU do calendário real, D_mod = 1/(1+y) exato (tol 1e-12)."""
     d_mod = duration.modificada(
-        data_compra=date(2026, 1, 1),
-        data_vencimento=date(2027, 1, 1),
+        data_compra=COMPRA_252_DU,
+        data_vencimento=VENCIMENTO_252_DU,
         taxa_anual=0.10,
         valor_nominal=1000.0,
         taxa_cupom_anual=0.0,

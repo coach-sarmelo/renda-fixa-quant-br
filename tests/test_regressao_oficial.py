@@ -2,8 +2,10 @@
 
 A fixture (tests/fixtures/tesouro_regressao_oficial.csv) é um excerto
 byte a byte do CSV oficial (CKAN/Tesouro Transparente) na data-base 15/07/2024:
-5 LTNs, sendo 3 dentro da tolerância (erro relativo <= 1e-3 de pu.calcular vs
-'PU Compra Manha'). Aqui o núcleo de pricing é confrontado com a VERDADE
+5 LTNs. Com o calendário real de dias úteis TODOS os 5
+batem a <= 1e-3 de pu.calcular vs 'PU Compra Manha' (erros medidos <= 1,7e-5);
+sob a aproximação ``dias corridos × 252/365`` batiam 3 de 5 (limitação
+medida em docs/dados.md). Aqui o núcleo de pricing é confrontado com a VERDADE
 EXTERNA (PU publicado), nunca com valores derivados do próprio código.
 
 Duration/YTM permanecem na consistência interna (cobertos por testes
@@ -24,11 +26,12 @@ from rfquant.pricing import pu
 
 CAMINHO_FIXTURE_REGRESSAO = Path(__file__).parent / "fixtures" / "tesouro_regressao_oficial.csv"
 
-# Trio dentro da tolerância, conforme a nota do cabeçalho de auditoria da fixture
-# ("os LTNs de vencimento 2025/2026/2027 batem com pu.calcular a 4,0e-4 /
-# 4,3e-4 / 8,5e-4"); 2029 e 2031 excedem 1e-3 por construção - limitação
-# medida da aproximação D6 de dias úteis (docs/dados.md) - e ficam fora do
-# escopo da tolerância (a excisão é fixada em test_ltns_fora_do_ac_excedem_1e_3).
+# Trio parametrizado (sob a aproximação dc × 252/365 batiam a 4,0e-4 / 4,3e-4 /
+# 8,5e-4; com o calendário real, a <= 1e-5). Os LTNs de 2029 e 2031, que excediam
+# 1e-3 POR CONSTRUÇÃO na aproximação (3,51e-3 / 4,88e-3 - limitação medida em
+# docs/dados.md), passam a bater com o calendário real - caracterizado em
+# test_ltns_2029_2031_batem_1e_3_apos_calendario_real (não mais "fora do AC":
+# hoje os 5 de 5 estão dentro da tolerância).
 TITULOS_NO_AC = ("01/01/2025", "01/01/2026", "01/01/2027")
 
 # Tolerância relativa do PU contra o oficial.
@@ -87,19 +90,21 @@ def test_linhas_da_fixture_sao_da_data_base_registrada_no_cabecalho() -> None:
 # PU do núcleo vs PU oficial publicado (verdade externa)
 #
 # Conta à mão por título (zero-cupom, VN 1000, compra na data-base
-# 15/07/2024; du = round(dc × 252/365), a aproximação D6 do núcleo):
-#   01/01/2025: dc = 170; du = 117;
-#     PU = 1000/1,1050^(117/252) = 1000 × e^(-0,46429 × 0,099845) = 954,70
-#     vs oficial 954,32 -> erro 4,0e-4 (o mercado usou du real 118 - a
-#     aproximação D6 fica 1 DU atrás do calendário, docs/dados.md).
-#   01/01/2026: dc = 535; du = 369;
-#     PU = 1000 × e^(-1,46429 × 0,105361) = 857,05
-#     vs oficial 856,68 -> erro 4,3e-4.
-#   01/01/2027: dc = 900; du = 621;
-#     PU = 1000 × e^(-2,46429 × 0,107876) = 766,58
-#     vs oficial 767,23 -> erro 8,5e-4.
+# 15/07/2024; du = dias úteis REAIS do calendário B3/SFN
+# (rfquant.data.calendario, validado a ±0 pela bateria de calendário em
+# tests/test_data_calendario.py):
+#   01/01/2025: dc = 170; du real = 118;
+#     PU = 1000/1,1050^(118/252) = 954,3231
+#     vs oficial 954,32 -> erro 3,3e-6.
+#   01/01/2026: dc = 535; du real = 370;
+#     PU = 1000/1,1111^(370/252) = 856,6881
+#     vs oficial 856,68 -> erro 9,5e-6.
+#   01/01/2027: dc = 900; du real = 619;
+#     PU = 1000/1,1139^(619/252) = 767,2367
+#     vs oficial 767,23 -> erro 8,7e-6.
 # (dc contado no calendário: 15/07/2024 -> 01/01/2025 = 170, +365 = 535,
-# +365 = 900; ln 1,1050 = 0,099845; ln 1,1111 = 0,105361; ln 1,1139 = 0,107876.)
+# +365 = 900. Histórico da aproximação: du = round(dc × 252/365) dava
+# 117/369/621 e erros 4,0e-4 / 4,3e-4 / 8,5e-4.)
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize("vencimento", TITULOS_NO_AC)
 def test_pu_do_nucleo_bate_com_o_oficial(vencimento: str) -> None:
@@ -125,9 +130,10 @@ def test_pelo_menos_3_ltns_batem_com_o_pu_oficial_a_1e_3() -> None:
     """>= 3 títulos da data-base batem com o oficial a 1e-3.
 
     Contrato (">= 3 títulos com PU oficial"): a data-base
-    15/07/2024 foi escolhida por ter 3 de 5 LTNs na tolerância. A
-    contagem impede que o trio parametrizado fique vacuamente verde (ex.:
-    linhas removidas da fixture).
+    15/07/2024 foi escolhida por ter 3 de 5 LTNs na tolerância (critério
+    original, sob a aproximação dc × 252/365; com o calendário real, os 5
+    batem). A contagem impede que o trio parametrizado fique vacuamente
+    verde (ex.: linhas removidas da fixture).
     """
     df = TesouroOficialProvider._parsear(_fixture_regressao())
     base = _data_base_do_cabecalho()
@@ -144,11 +150,18 @@ def test_pelo_menos_3_ltns_batem_com_o_pu_oficial_a_1e_3() -> None:
     assert dentro >= 3
 
 
-def test_ltns_fora_do_ac_excedem_1e_3() -> None:
-    """Caracterização da excisão documentada no cabeçalho de auditoria: os LTNs
-    de 2029 e 2031 excedem 1e-3 (medidos: 3,51e-3 e 4,88e-3) - o descolamento
-    do du D6 cresce com o prazo (docs/dados.md). Se isto falhar um dia, a
-    fórmula de PU mudou: regravar a fixture (mesmo padrão de cabeçalho).
+def test_ltns_2029_2031_batem_1e_3_apos_calendario_real() -> None:
+    """Os LTNs que excediam 1e-3 na aproximação dc × 252/365 (3,51e-3 e
+    4,88e-3 - o descolamento do du aproximado crescia com o prazo,
+    docs/dados.md) batem com o oficial a <= 1e-3 com o calendário real.
+
+    A queda do erro é o ganho esperado do calendário real - a raiz do
+    desvio era o du aproximado. Medidos com o calendário real: 5,70e-6
+    (01/01/2029, du real 1118) e 1,70e-5 (01/01/2031, du real 1619). A
+    tolerância de 1e-3 não muda - o teste agora a EXIGE onde antes
+    congelava o erro alto.
+    Se isto falhar um dia, a fórmula de PU mudou de novo: regravar a fixture
+    (mesmo padrão de cabeçalho).
     """
     base = _data_base_do_cabecalho()
     for vencimento in ("01/01/2029", "01/01/2031"):
@@ -159,4 +172,4 @@ def test_ltns_fora_do_ac_excedem_1e_3() -> None:
             data_vencimento=datetime.strptime(vencimento, "%d/%m/%Y").date(),
             taxa_anual=float(linha["Taxa Compra Manha"]) / 100.0,
         )
-        assert abs(pu_teorico - pu_oficial) / pu_oficial > TOLERANCIA_PU, vencimento
+        assert abs(pu_teorico - pu_oficial) / pu_oficial <= TOLERANCIA_PU, vencimento

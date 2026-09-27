@@ -27,6 +27,7 @@ COLUNAS_ESPERADAS = [
     "data_referencia",
     "isento_ir",
     "emissor",
+    "categoria",
 ]
 TIPOS_VALIDOS = {"Prefixado", "IPCA+", "Selic", "CDI", "Outro"}
 CAMPOS_DECIMAL_OU_NONE = ["taxa_compra", "taxa_venda", "pu_compra", "pu_venda"]
@@ -48,6 +49,9 @@ def validar_df_titulos(df: pd.DataFrame) -> None:
         assert isinstance(t["data_referencia"], date), f"data_referencia: {t['data_referencia']!r}"
         assert isinstance(t["isento_ir"], bool), f"isento_ir: {t['isento_ir']!r}"
         assert isinstance(t["emissor"], str) and t["emissor"], f"emissor vazio: {t['emissor']!r}"
+        assert t["categoria"] is None or isinstance(t["categoria"], str), (
+            f"categoria: {t['categoria']!r}"
+        )
         for campo in CAMPOS_DECIMAL_OU_NONE:
             valor = t[campo]
             assert valor is None or isinstance(valor, Decimal), (
@@ -98,6 +102,7 @@ def test_bateria_nao_e_vacua_dict_mal_formado() -> None:
                 "data_referencia": DATA_REF,
                 "isento_ir": False,
                 "emissor": "Tesouro Nacional",
+                "categoria": None,
             }
         ]
     )

@@ -11,11 +11,14 @@ from rfquant.pricing.fluxo_caixa import gerar_fluxos
 
 
 def test_zero_cupom_pu_exato_1e9() -> None:
-    """Zero-cupom de 365 dias corridos (= 252 DU pela D6) a 10%
-    deve ter PU = 1000/1,1 com tolerância relativa 1e-9."""
+    """Zero-cupom com prazo de exatamente 252 DU do calendário real
+    (05/01/2026 → 08/01/2027) a 10% deve ter PU = 1000/1,1 com tolerância
+    relativa 1e-9. Antes do calendário real o caso usava 365 dc pela
+    aproximação ``dias corridos × 252/365`` — substituída pelo calendário
+    real (tests/test_data_calendario.py)."""
     p = pu.calcular(
-        data_compra=date(2026, 1, 1),
-        data_vencimento=date(2027, 1, 1),
+        data_compra=date(2026, 1, 5),
+        data_vencimento=date(2027, 1, 8),
         taxa_anual=0.10,
         valor_nominal=1000.0,
         taxa_cupom_anual=0.0,

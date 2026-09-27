@@ -67,7 +67,8 @@ def gerar_offline(dados: dict[str, Any]) -> str:
 
     Determinístico: a mesma entrada produz a mesma saída no mesmo dia
     (o cabeçalho carrega `date.today()`). Sem rede e sem dependências de
-    LLM — útil para a CLI e para testes.
+    LLM — útil para a CLI e para testes. O disclaimer regulatório fecha
+    o relatório.
     """
     linhas: list[str] = ["# Relatório de Carteira de Renda Fixa\n"]
     linhas.append(f"*Gerado em {date.today().isoformat()}*\n")
