@@ -75,8 +75,8 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 # Marker único da suíte (network) registrado ⇒ --strict-markers ativo nos
 # addopts é seguro: marker grafado errado num teste novo falha NA COLETA
-# (AC-CAP6-02/T32 — "strict=True" do plano), não vaza silencioso para a
-# suíte padrão nem escapa do -m network do job semanal (§13.7).
+# e não vaza silencioso para a suíte padrão nem escapa do -m network do
+# job semanal.
 markers = ["network: requer rede real (skip por padrão)"]
 addopts = "-q --cov=rfquant --cov-report=term-missing --strict-markers -m 'not network'"
 

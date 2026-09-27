@@ -44,8 +44,8 @@ jobs:
         run: pytest
 
   # Suíte @pytest.mark.network: só no gatilho semanal — nunca no CI de PR
-  # (rede não é gate de merge; o `if` do job é quem isola o PR). Cobertura
-  # §13.7: Tesouro Oficial (~14,5 MB — docs/dados.md:15), CVM informe diário
+  # (rede não é gate de merge; o `if` do job é quem isola o PR). Cobertura:
+  # Tesouro Oficial (~14,5 MB — docs/dados.md:15), CVM informe diário
   # (~11 MB) e SGS série 12 (JSON pequeno, sem auth).
   network:
     if: github.event_name == 'schedule'
