@@ -19,8 +19,8 @@
 |--------|-----------|------|
 | **Precificação** | PU, duration (Macaulay e modificada) e Current Yield na CLI (`rfq tesouro precificar`); YTM e marcação a mercado (linear e exata) via biblioteca | CLI e biblioteca |
 | **Curva de juros** | Interpolação da ETTJ (linear / Nelson-Siegel), conversões nominal↔efetiva e pré↔IPCA+ | Biblioteca |
-| **Comparação** | IR regressivo + IOF, taxa equivalente entre produtos isentos e tributados, ranking pelo líquido | CLI e biblioteca |
-| **Dados** | Tesouro Direto pela fonte oficial (Tesouro Transparente — CSV público, sem token) | CLI e biblioteca |
+| **Comparação** | IR regressivo + IOF, taxa equivalente entre produtos isentos e tributados | CLI e biblioteca |
+| **Dados** | Tesouro Direto (CSV oficial do Tesouro Transparente), CDI (série SGS/BCB) e fundos (informes da CVM) — fontes oficiais, sem token | CLI e biblioteca |
 | **Interfaces** | CLI (`rfq`), notebooks Jupyter e biblioteca Python | — |
 
 ## Instalação
@@ -146,7 +146,7 @@ make format   # formata com ruff
 
 ```
 src/rfquant/
-├── data/            # Providers (Tesouro oficial) + cache em disco
+├── data/            # Providers (Tesouro, SGS/BCB, CVM) + cache em disco
 ├── pricing/         # PU, duration, YTM, marcação a mercado, curva de juros
 ├── comparison/      # IR, IOF, taxa equivalente
 ├── cli.py           # Interface de linha de comando (rfq)
@@ -160,7 +160,7 @@ explícitas e dados oficiais — nunca de fontes não auditáveis. Detalhes em
 
 ## Limitações que vale a pena conhecer
 
-- **Dias úteis aproximados (D6):** o núcleo estima dias úteis por
+- **Dias úteis aproximados:** o núcleo estima dias úteis por
   `dias corridos × 252/365`; o Tesouro oficial usa o calendário real. O erro
   do PU cresce com o prazo — tabelas medidas em [dados.md](docs/dados.md).
 - A comparação de taxas aplica o IR de forma linear pela alíquota do prazo

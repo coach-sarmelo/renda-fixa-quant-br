@@ -63,25 +63,19 @@ Opções:
 
 | Opção | Descrição | Padrão |
 |---|---|---|
-| `--fonte` | `oficial` (sem token) ou `brapi` | `brapi` |
+| `--fonte` | `auto` (mapa declarado), `oficial` (sem token) ou `brapi` (requer `BRAPI_TOKEN`) | `auto` |
 | `--tipo` | Filtra por tipo: `IPCA+`, `Prefixado`, `Selic` | — |
 | `--limite` | Número máximo de resultados | 50 |
 
-> **Use sempre `--fonte=oficial`.** O padrão é `brapi`, que falha sem
-> `BRAPI_TOKEN` (exit 1, mensagem explícita) e, mesmo com token de conta
-> gratuita, esbarra no paywall do endpoint de renda fixa. A fonte oficial
-> baixa o CSV público do Tesouro Transparente (sem cadastro), com cache
-> local de 24 h — a primeira execução do dia baixa ~14,5 MB; as seguintes
-> leem do cache.
-
-> **Por que o padrão é `brapi` se ela é inutilizável hoje?** Razão
-> histórica: `brapi` foi a primeira fonte do projeto (configurável por
-> `BRAPI_TOKEN`, plano Pro) e o default não foi trocado quando a fonte
-> oficial chegou, para não quebrar quem já tinha token e scripts prontos.
-> Não há variável de ambiente para trocar o default — passe
-> `--fonte=oficial` explicitamente ou crie um alias
-> (`alias rfq='rfq tesouro listar --fonte=oficial'` no seu shell). A troca
-> do default para `oficial` está registrada como melhoria futura.
+> **Sobre a opção `--fonte`:** o padrão é `auto` — um mapa declarado resolve
+> cada dado pela sua fonte oficial (títulos → Tesouro Transparente; CDI →
+> série SGS/BCB; fundos → CVM) e a CLI anuncia a fonte usada
+> (`fonte: oficial`). `--fonte=oficial` fixa o Tesouro como fonte (pino de
+> reprodutibilidade, sem token). `--fonte=brapi` hoje **não é utilizável**
+> (exige plano pago e falha sem `BRAPI_TOKEN`) — a resolução automática
+> nunca o escolhe. A fonte oficial baixa o CSV público do Tesouro
+> Transparente (sem cadastro), com cache local de 24 h — a primeira
+> execução do dia baixa ~14,5 MB; as seguintes leem do cache.
 
 Exemplo de saída (`--fonte=oficial --tipo Prefixado --limite 3`):
 
@@ -153,7 +147,8 @@ Current Yield:  5.9187%
 ```
 
 O Current Yield só aparece quando o cupom é maior que zero. As fórmulas e
-a aproximação de dias úteis (D6) estão em [formulas.md](formulas.md).
+a aproximação de dias úteis (dias corridos × 252/365) estão em
+[formulas.md](formulas.md).
 
 ### `rfq comparar`
 
@@ -168,11 +163,19 @@ Opções:
 | Opção | Descrição | Padrão |
 |---|---|---|
 | `--cdb` | Taxa bruta do CDB em % a.a. | — |
+| `--cdb-cdi` | Taxa bruta do CDB em % do CDI (ex.: 110); exige `--cdi-auto` ou `--cdi` | — |
 | `--lci` | Taxa da LCI/LCA em % a.a. | — |
 | `--tesouro` | Taxa do Tesouro em % a.a. | — |
+| `--debenture` | Taxa bruta da debênture em % a.a. | — |
+| `--incentivada` | Debênture incentivada (isenta de IR por categoria) | desativada |
+| `--cdi-auto` | Obtém o CDI anual da série oficial SGS/BCB (série 12, sem token) | desativada |
+| `--cdi` | CDI anual informado pelo usuário, em % a.a. (ex.: 13.0) | — |
 | `--prazo` | Prazo em dias corridos | 720 |
 
-Informe ao menos um produto (senão a CLI encerra com erro). Saída real do
+Informe ao menos um produto (senão a CLI encerra com erro). O CDB entra em
+uma única unidade (`--cdb` ou `--cdb-cdi`) e o CDI por uma única fonte
+(`--cdi-auto` ou `--cdi`) — uso ambíguo é rejeitado com mensagem explícita.
+Saída real do
 comando acima (IR de 17,5% para 720 dias):
 
 ```
@@ -190,6 +193,28 @@ A coluna "Equivalente CDB" responde: qual taxa bruta de CDB renderia o
 mesmo líquido? No exemplo, a LCI/LCA isenta a 10,5% equivale a um CDB bruto
 de ~12,73% — melhor que o CDB de 12% oferecido. A convenção de cálculo e
 sua limitação para prazos ≠ 1 ano estão em [formulas.md](formulas.md#13-convenção-de-taxa-líquida-na-comparação-limitação-declarada).
+
+### `rfq fundos resumo`
+
+Resume a rentabilidade de um fundo de investimento no mês, a partir do
+informe diário da CVM (dados abertos, sem token).
+
+```
+rfq fundos resumo --cnpj 00.000.000/0000-00 --mes 2026-08
+```
+
+Opções:
+
+| Opção | Descrição |
+|---|---|
+| `--cnpj` | CNPJ do fundo (com ou sem pontuação) |
+| `--mes` | Mês de referência, no formato `AAAA-MM` (ex.: `2026-08`) |
+
+O comando imprime três números, na mesma convenção da biblioteca:
+rentabilidade **acumulada** do período, **anualizada** (base 252, dias
+úteis do calendário real) e em **% do CDI** (série SGS/BCB na mesma janela
+do fundo). A fonte é o arquivo do informe diário da CVM do mês de
+referência (~11 MB, cache de 24 h).
 
 ### `rfq relatorio gerar`
 
@@ -384,9 +409,9 @@ make format  # formata com ruff
 
 | Sintoma | Causa e solução |
 |---|---|
-| `BRAPI_TOKEN ausente ou inválido.` ao listar títulos | Você rodou `rfq tesouro listar` sem `--fonte` (o padrão é `brapi`). Use `--fonte=oficial`. |
-| `Fonte '...' desconhecida.` | Valor inválido em `--fonte`. Os valores aceitos são `oficial` e `brapi`. |
+| `BRAPI_TOKEN ausente ou inválido.` ao listar títulos | Você fixou `--fonte=brapi` explicitamente — o padrão (`auto`) nunca o escolhe. Use `--fonte=oficial` (não requer token) ou configure o `BRAPI_TOKEN` no `.env`. |
+| `Fonte '...' desconhecida.` | Valor inválido em `--fonte`. Os valores aceitos são `auto`, `oficial` e `brapi`. |
 | Primeira listagem do dia demora | O CSV oficial (~14,5 MB) está sendo baixado; execuções seguintes leem do cache de 24 h (`~/.rfquant/cache`). |
 | `rfq relatorio gerar --no-offline` termina com erro | Comportamento esperado: não existe geração por IA. Use o padrão (`--offline`). |
-| PU difere do site do Tesouro | Aproximação de dias úteis (D6) — o erro cresce com o prazo. Tabelas medidas em [dados.md](dados.md). |
+| PU difere do site do Tesouro | Aproximação de dias úteis (dias corridos × 252/365) — o erro cresce com o prazo. Tabelas medidas em [dados.md](dados.md). |
 | Acentos quebrados na saída (ex.: `Compara��o`) | O terminal está numa codepage OEM. No Prompt de Comando, rode `chcp 65001` antes da CLI; no PowerShell, `$env:PYTHONUTF8 = "1"`; ou use o Windows Terminal. |

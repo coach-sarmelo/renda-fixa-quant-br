@@ -21,10 +21,14 @@ Comparação (IR regressivo, IOF, taxa equivalente)
 Interfaces (CLI `rfq`, notebooks, biblioteca Python)
 ```
 
-**Status das fontes:** em produção, apenas o CSV oficial do Tesouro
-Transparente (baixado no máximo 1×/24 h). O valor `--fonte=brapi` existe na
-CLI, mas o endpoint de renda fixa da brapi hoje exige plano pago — não é
-utilizável e está apenas como plano futuro (detalhes em [dados.md](dados.md)).
+**Status das fontes:** três fontes oficiais em produção, cada uma dona de
+um tipo de dado no mapa declarado (`src/rfquant/data/fontes.py`): títulos do
+Tesouro Direto → CSV oficial do Tesouro Transparente (baixado no máximo
+1×/24 h); CDI → série 12 do SGS/BCB (JSON, sem token); fundos → informes
+diários da CVM. O provider brapi existe no código, mas fica **fora** do
+mapa: o endpoint de renda fixa da brapi hoje exige plano pago — não é
+utilizável e só é acionado se o usuário fixar `--fonte=brapi`
+(detalhes em [dados.md](dados.md)).
 
 ## Princípios arquiteturais
 
@@ -36,7 +40,7 @@ geração de números por modelos de linguagem nem por fontes não auditáveis.
 
 ### 2. Dados atrás de uma interface
 
-Todo acesso a dados passa pela interface abstrata `DataProvider`
+O acesso aos **títulos** passa pela interface abstrata `DataProvider`
 (`src/rfquant/data/base.py`). Isso permite trocar a fonte sem mexer no
 núcleo:
 
@@ -54,6 +58,14 @@ Transparente) — um download cacheado seguido de parsing/filtro; é a fonte
 de produção de `--fonte=oficial`. O modelo normalizado de saída é o
 `Titulo` (pydantic), com nome, tipo, vencimento, taxas e PUs de
 compra/venda.
+
+Os providers de **séries** — CDI (`SGSProvider`, SGS/BCB) e fundos
+(`CVMFundosProvider`, CVM) — usam contrato próprio de série e **não**
+estendem a `DataProvider`: `titulos_disponiveis`/`historico_taxas`
+descrevem títulos, e forçar séries macro ou informes de fundos nesse molde
+distorceria o contrato. A disciplina de contrato deles fica com a bateria
+de `tests/test_data_contrato_series.py`, e a escolha da fonte por tipo de
+dado é o mapa declarado de `src/rfquant/data/fontes.py` (`--fonte=auto`).
 
 ### 3. Cache obrigatório
 

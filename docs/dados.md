@@ -70,20 +70,20 @@ Títulos da data-base 15/07/2024 (erro = |`pu.calcular` − PU oficial| / PU ofi
 | 01/01/2031 | 11,90% | 485,60 | 483,2308 | 4,88e-3 | ✗ |
 
 Exemplo de derivação à mão (01/01/2025): dc = 170 dias corridos; a
-aproximação D6 dá
+aproximação (dias corridos × 252/365) dá
 du = round(170 × 252/365) = 117; PU = 1000/(1,105)^(117/252) = 954,70.
 O PU oficial de 954,32 implica du oficial = 252·ln(1000/954,32)/ln(1,105) =
 118,01 → **118 dias úteis reais** — 1 DU de diferença explica o erro.
 
-### Limitação medida da aproximação D6 de dias úteis
+### Limitação medida da aproximação de dias úteis (252/365)
 
 O núcleo (`pu.calcular`, `src/rfquant/pricing/pu.py`) estima dias úteis por
-D6 (dias corridos × 252/365 — ver [formulas.md](formulas.md)); o PU oficial
+dias corridos × 252/365 (ver [formulas.md](formulas.md)); o PU oficial
 do Tesouro desconta pelos dias úteis **reais** do calendário brasileiro
 (com feriados). O erro relativo do PU resultante **cresce com o prazo** —
 medido na data-base 30/06/2026 (só 1 dos 5 LTNs fica dentro de 1e-3):
 
-| Vencimento | Taxa compra | PU oficial | `pu.calcular` (D6) | Erro rel. | du D6 | du oficial* |
+| Vencimento | Taxa compra | PU oficial | `pu.calcular` (aprox. 252/365) | Erro rel. | du aprox. | du oficial* |
 |---|---|---|---|---|---|---|
 | 01/01/2027 | 13,78% | 937,01 | 936,5308 | 5,11e-4 | 128 | 127 |
 | 01/01/2028 | 14,07% | 820,81 | 819,9533 | 1,04e-3 | 380 | 378 |
@@ -151,11 +151,11 @@ IPCA) seguem apenas como referência externa, no radar de integração (ver
 | CVM (CSV) | Arquivos grandes: informe mensal ~11 MB/mês e cadastro `cad_fi.csv` ~17,1 MB — baixados sob demanda, com cache em disco (TTL 24 h) |
 | Debêntures | Não há API pública consolidada (ANBIMA requer assinatura) |
 | CDB / LCI / LCA | Não há API centralizada; o usuário informa as taxas |
-| Núcleo de pricing vs Tesouro | Dias úteis por D6 (252/365): erro do PU vs oficial cresce com o prazo — 5,11e-4 a 4,80e-3 nos 5 LTNs da data-base 30/06/2026 (seção "Limitação medida da aproximação D6"); calendário real de feriados está no radar |
+| Núcleo de pricing vs Tesouro | Dias úteis pela aproximação dias corridos × 252/365: erro do PU vs oficial cresce com o prazo — 5,11e-4 a 4,80e-3 nos 5 LTNs da data-base 30/06/2026 (seção "Limitação medida da aproximação de dias úteis (252/365)"); calendário real de feriados está no radar |
 
 ## Próximos passos
 
-- [ ] Calendário brasileiro real de feriados para dias úteis exatos (remove a limitação D6)
+- [ ] Calendário brasileiro real de feriados para dias úteis exatos (remove a limitação da aproximação 252/365)
 - [ ] Demais séries macro (Selic meta, IPCA) via SGS/BCB como providers
 - [ ] Scraper do portal do Tesouro Direto como **fonte contingencial — planejada, não implementada** (só seria acionada se o CSV oficial deixasse de funcionar)
 - [ ] Integração com ANBIMA para debêntures

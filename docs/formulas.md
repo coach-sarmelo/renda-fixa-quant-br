@@ -35,7 +35,7 @@ Onde:
   menores ou iguais)
 - `du_t` = dias úteis até o fluxo `t`, na base 252 do mercado brasileiro
 
-**A aproximação D6 (dias úteis).** O `rfquant` estima os dias úteis por
+**A aproximação de dias úteis (dias corridos × 252/365).** O `rfquant` estima os dias úteis por
 
 $$du = \text{round}\left(dc \times \frac{252}{365}\right)$$
 
@@ -44,7 +44,7 @@ proporcionalidade: ela acerta a média de longo prazo, mas ignora onde os
 feriados caem. O Tesouro oficial desconta pelos dias úteis **reais** do
 calendário brasileiro, então o PU calculado diverge do oficial — e o erro
 **cresce com o prazo** (tabelas medidas em [dados.md](dados.md), seção
-"Limitação medida da aproximação D6"). Para prazos curtos a divergência é
+"Limitação medida da aproximação de dias úteis (252/365)"). Para prazos curtos a divergência é
 pequena (tipicamente < 1 dia útil); para prazos de anos ela se acumula.
 
 Implementação: `pu.calcular` (`pricing/pu.py`).
