@@ -154,3 +154,61 @@ def test_titulo_vencido_levanta_value_error() -> None:
             taxa_compra=0.10,
             taxa_mercado=0.10,
         )
+
+
+# ----------------------------------------------------------------------
+# Aproximada (fórmula linear por duration) e curva (lote de títulos)
+# ----------------------------------------------------------------------
+def test_aproximada_bate_com_a_formula_linear_a_mao() -> None:
+    """A aproximada é a fórmula do docstring, à mão:
+    PU_compra·(1 - D_mod·Δy) = 1000·(1 - 4·0,005) = 980,00; com Δy = 0
+    ela devolve o próprio PU de compra (nenhum efeito de taxa)."""
+    assert marktomarket.aproximada(1000.0, 0.10, 0.105, 4.0) == pytest.approx(980.0, abs=1e-9)
+    assert marktomarket.aproximada(1000.0, 0.10, 0.10, 4.0) == pytest.approx(1000.0, abs=1e-12)
+
+
+def test_curva_aplica_exata_a_cada_titulo_preservando_ordem_e_defaults() -> None:
+    """`curva` marca cada título do lote com `exata`, na MESMA ordem da
+    entrada; chaves opcionais ausentes assumem os defaults do contrato
+    (nominal 1000, cupom 0, 2 cupons/ano) — provado recomputando `exata`
+    com os mesmos argumentos e comparando campo a campo."""
+    lote = [
+        {
+            "data_compra": date(2026, 1, 2),
+            "data_vencimento": date(2029, 1, 2),
+            "pu_compra": 780.0,
+            "taxa_compra": 0.115,
+            "taxa_mercado": 0.12,
+        },
+        {
+            "data_compra": date(2026, 1, 2),
+            "data_vencimento": date(2031, 1, 2),
+            "pu_compra": 950.0,
+            "taxa_compra": 0.10,
+            "taxa_mercado": 0.09,
+            "valor_nominal": 500.0,
+            "taxa_cupom_anual": 0.06,
+            "frequencia_cupom": 1,
+        },
+    ]
+    resultados = marktomarket.curva(date(2026, 6, 2), lote)
+
+    assert len(resultados) == 2
+    for res, titulo in zip(resultados, lote, strict=True):
+        esperado = marktomarket.exata(
+            data_compra=titulo["data_compra"],
+            data_hoje=date(2026, 6, 2),
+            data_vencimento=titulo["data_vencimento"],
+            pu_compra=titulo["pu_compra"],
+            taxa_compra=titulo["taxa_compra"],
+            taxa_mercado=titulo["taxa_mercado"],
+            valor_nominal=titulo.get("valor_nominal", 1000.0),
+            taxa_cupom_anual=titulo.get("taxa_cupom_anual", 0.0),
+            frequencia_cupom=titulo.get("frequencia_cupom", 2),
+        )
+        assert res == esperado
+
+
+def test_curva_com_lote_vazio_devolve_lista_vazia() -> None:
+    """Lote vazio ⇒ lista vazia — sem exceção, sem marcação fantasma."""
+    assert marktomarket.curva(date(2026, 6, 2), []) == []

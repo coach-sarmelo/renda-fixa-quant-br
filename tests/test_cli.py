@@ -642,8 +642,8 @@ def test_fundos_resumo_cnpj_sem_informe_erro_ptbr(http_fixture_fundos) -> None:
 # ----------------------------------------------------------------------
 # Falha de rede em TODO comando que acessa rede: timeout, HTTP 5xx e DNS,
 # injetados no requests.get — mensagem pt-BR + dica acionável + exit ≠ 0,
-# sem traceback cru. `ranking top` não participa: lê lote local do usuário
-# e não consulta nenhuma fonte de rede.
+# sem traceback cru. O comando de lote local não participa: lê um arquivo
+# do usuário e não consulta nenhuma fonte de rede.
 # ----------------------------------------------------------------------
 COMANDOS_COM_REDE: dict[str, list[str]] = {
     "listar": ["tesouro", "listar"],

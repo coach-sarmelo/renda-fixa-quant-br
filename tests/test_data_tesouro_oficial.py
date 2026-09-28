@@ -292,3 +292,30 @@ def test_titulos_disponiveis_data_sem_linhas_devolve_vazio(provider_real) -> Non
     df = provider_real.titulos_disponiveis(data=date(2026, 9, 1))
     assert isinstance(df, pd.DataFrame)
     assert df.empty
+
+
+# ----------------------------------------------------------------------
+# Ramos de erro do parser de linha (`_titulo`): a célula do CSV pode vir
+# vazia (NaN após o read_csv) ou com texto não numérico — os dois casos
+# viram campo None no modelo, nunca exceção.
+# ----------------------------------------------------------------------
+def test_titulo_com_celula_vazia_ou_ilegivel_converte_para_none() -> None:
+    """Linha com taxa de compra vazia (NaN) e taxa de venda ilegível sai
+    como `Titulo` com os dois campos None e o PU intacto — o parser
+    degrada célula a célula em vez de descartar o título ou estourar."""
+    linha = pd.Series(
+        {
+            "Tipo Titulo": "Tesouro Prefixado",
+            "Data Vencimento": pd.Timestamp("2029-01-01"),
+            "Data Base": pd.Timestamp("2026-09-18"),
+            "Taxa Compra Manha": float("nan"),
+            "Taxa Venda Manha": "não é número",
+            "PU Compra Manha": Decimal("571.16"),
+            "PU Venda Manha": Decimal("568.32"),
+        }
+    )
+    titulo = TesouroOficialProvider._titulo(linha)
+    assert titulo.taxa_compra is None
+    assert titulo.taxa_venda is None
+    assert titulo.pu_compra == Decimal("571.16")
+    assert titulo.nome == "Tesouro Prefixado 2029"

@@ -74,3 +74,55 @@ def test_prazo_nao_positivo_levanta_value_error(prazo: float) -> None:
     e = ETTJ(PONTOS, metodo="linear")
     with pytest.raises(ValueError):
         e.taxa(prazo)
+
+
+# ----------------------------------------------------------------------
+# taxas_vetor e utilitários de conversão de taxas
+# ----------------------------------------------------------------------
+def test_taxa_vetor_devolve_a_taxa_de_cada_prazo() -> None:
+    """`taxa_vetor` é a consulta ponto a ponto empacotada em array: o
+    resultado coincide com `taxa` chamada prazo a prazo, na mesma ordem."""
+    e = ETTJ(PONTOS, metodo="linear")
+    prazos = [1.0, 3.5, 10.0]
+    vetor = e.taxa_vetor(prazos)
+    assert vetor == pytest.approx([e.taxa(p) for p in prazos], rel=1e-12)
+    # interpolação dentro da faixa e reprodução do nó de 10 anos
+    assert 0.118 <= vetor[1] <= 0.125
+    assert vetor[2] == pytest.approx(0.135, abs=1e-12)
+
+
+def test_taxa_efetiva_para_nominal_bate_com_a_formula_e_inverte() -> None:
+    """Efetiva→nominal é a fórmula j_nom = n·((1+j_ef)^(1/n) - 1): 10% a.a.
+    efetivo com capitalização semestral dá ~9,7618% nominal — e o caminho
+    de volta recupera a efetiva original (conversões inversas)."""
+    nominal = curva_juros.taxa_efetiva_para_nominal(0.10, periodos=2)
+    assert nominal == pytest.approx(2 * ((1.10) ** 0.5 - 1), rel=1e-12)
+    assert curva_juros.taxa_nominal_para_efetiva(nominal, periodos=2) == pytest.approx(
+        0.10, rel=1e-12
+    )
+
+
+def test_taxa_nominal_para_efetiva_bate_com_a_conta_a_mao() -> None:
+    """Nominal 10% com capitalização mensal capitaliza (1 + 0,10/12)^12:
+    efetiva ≈ 10,4713% — maior que a nominal, como esperado."""
+    efetiva = curva_juros.taxa_nominal_para_efetiva(0.10, periodos=12)
+    assert efetiva == pytest.approx((1 + 0.10 / 12) ** 12 - 1, rel=1e-12)
+    assert efetiva > 0.10
+
+
+@pytest.mark.parametrize(("periodos"), [0, -2])
+def test_periodos_nao_positivo_nas_conversoes_levanta_value_error(periodos: int) -> None:
+    """Número de períodos ≤ 0 nas duas conversões de capitalização ⇒
+    ValueError (entrada sem sentido não vira número absurdo)."""
+    with pytest.raises(ValueError):
+        curva_juros.taxa_efetiva_para_nominal(0.10, periodos=periodos)
+    with pytest.raises(ValueError):
+        curva_juros.taxa_nominal_para_efetiva(0.10, periodos=periodos)
+
+
+def test_relacao_de_fisher_conecta_pre_e_real_nos_dois_sentidos() -> None:
+    """Fisher exata: (1+pre) = (1+real)·(1+ipca). Prefixado 12% com IPCA
+    esperado de 5% ⇒ real ≈ 6,6667%; o caminho de volta reconstrói o 12%."""
+    real = curva_juros.taxa_pre_para_pos(0.12, 0.05)
+    assert real == pytest.approx(1.12 / 1.05 - 1, rel=1e-12)
+    assert curva_juros.taxa_pos_para_pre(real, 0.05) == pytest.approx(0.12, rel=1e-12)
