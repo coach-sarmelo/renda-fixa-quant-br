@@ -40,6 +40,7 @@ das fixtures texto; a auditoria vive AQUI e no sidecar
 
 from __future__ import annotations
 
+import pickle
 import zipfile
 from datetime import date
 
@@ -48,6 +49,7 @@ import pytest
 import requests
 from conftest import FIXTURE_ZIP, RespostaErro, RespostaZip
 
+from rfquant.data import cache
 from rfquant.data.cvm_fundos import (
     CVM_BASE_URL,
     TTL_CVM,
@@ -399,6 +401,28 @@ def test_frame_parseado_cacheado_alem_do_zip(
     assert parses["n"] == 1
     validar_contrato_informe(df2)
     assert df1.equals(df2)
+
+
+def test_payload_do_frame_cacheado_e_portavel_ao_pickle(
+    provider_cvm: CVMFundosProvider,
+) -> None:
+    """O payload do frame no cache é portável ao pickle: nenhum ambiente
+    precisa do pyarrow para ler o que outro gravou.
+
+    O pandas 3.x com pyarrow faz TODA coluna de string de um DataFrame
+    virar ArrowStringArray — o pickle do FRAME referencia o pyarrow e
+    quebra a leitura em ambiente sem o pacote (o pacote público lendo o
+    cache do desenvolvimento, por exemplo). O provider grava um dict de
+    arrays numpy (portável por construção) e o leitor reconstrói o frame
+    com os dtypes nativos do ambiente.
+    """
+    df1 = provider_cvm.informe_diario(ANO, MES)
+    payload = cache.get(provider_cvm._url_mes(ANO, MES) + "::df")
+    assert not isinstance(payload, pd.DataFrame)
+    assert b"pyarrow" not in pickle.dumps(payload)
+    reconstruido = cache.frame_do_cache(payload)
+    assert reconstruido is not None
+    assert reconstruido.equals(df1)
 
 
 def test_frame_cache_nao_vaza_entre_meses(

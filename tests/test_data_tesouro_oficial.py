@@ -8,6 +8,7 @@ ordenar e expor historico por período.
 
 from __future__ import annotations
 
+import pickle
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -17,6 +18,7 @@ import pytest
 import requests
 from conftest import RespostaFake
 
+from rfquant.data import cache
 from rfquant.data.tesouro_oficial import TesouroOficialProvider
 
 CSV_SINTETICO = (
@@ -319,3 +321,22 @@ def test_titulo_com_celula_vazia_ou_ilegivel_converte_para_none() -> None:
     assert titulo.taxa_venda is None
     assert titulo.pu_compra == Decimal("571.16")
     assert titulo.nome == "Tesouro Prefixado 2029"
+
+
+def test_payload_do_frame_cacheado_e_portavel_ao_pickle(provider_real) -> None:
+    """O payload do frame cacheado do CSV oficial é portável ao pickle.
+
+    Portabilidade do cache de disco: o pandas 3.x com pyarrow faz toda
+    coluna de string de um DataFrame virar ArrowStringArray e o pickle do
+    FRAME referencia o pyarrow — um ambiente com o pacote gravaria um
+    cache que outro (ex.: o pacote público, sem pyarrow) não consegue
+    ler. O provider grava um dict de arrays numpy e o leitor reconstrói
+    o frame com os dtypes nativos do ambiente dele.
+    """
+    provider_real.titulos_disponiveis()
+    payload = cache.get(provider_real.url + "::df")
+    assert not isinstance(payload, pd.DataFrame)
+    assert b"pyarrow" not in pickle.dumps(payload)
+    reconstruido = cache.frame_do_cache(payload)
+    assert reconstruido is not None
+    assert list(reconstruido.columns) == COLUNAS_CSV_OFICIAL

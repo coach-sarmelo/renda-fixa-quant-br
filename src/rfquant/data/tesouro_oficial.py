@@ -96,9 +96,7 @@ class TesouroOficialProvider(DataProvider):
         # TTL do CSV — texto e frame expiram juntos.
         chave_frame = f"{self.url}::df"
         df_cache: pd.DataFrame | None = None
-        cached_frame = cache.get(chave_frame)
-        if isinstance(cached_frame, pd.DataFrame):
-            df_cache = cached_frame
+        df_cache = cache.frame_do_cache(cache.get(chave_frame))
         if df_cache is None:
             texto: str | None = cache.get(self.url)
             if texto is None:
@@ -107,7 +105,10 @@ class TesouroOficialProvider(DataProvider):
                 texto = resp.text
                 cache.set(self.url, texto, ttl=self.ttl)
             df_cache = self._parsear(texto)
-            cache.set(chave_frame, df_cache, ttl=self.ttl)
+            # Payload portável (dict de arrays numpy) em vez do frame
+            # picklado: pickle de frame do pandas 3 referencia o pyarrow e
+            # não desserializa em ambiente sem o pacote.
+            cache.set(chave_frame, cache.frame_para_cache(df_cache), ttl=self.ttl)
         return df_cache
 
     @staticmethod

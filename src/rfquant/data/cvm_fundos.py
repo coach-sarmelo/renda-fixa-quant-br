@@ -145,9 +145,7 @@ class CVMFundosProvider:
         chave_frame = f"{url}::df"
         df_cache: pd.DataFrame | None = None
         if usar_cache:
-            cached = cache.get(chave_frame)
-            if isinstance(cached, pd.DataFrame):
-                df_cache = cached
+            df_cache = cache.frame_do_cache(cache.get(chave_frame))
         if df_cache is None:
             zip_bytes = self._baixar_zip(ano, mes, usar_cache=usar_cache)
             csv_bytes = self._extrair_csv(zip_bytes)
@@ -166,7 +164,10 @@ class CVMFundosProvider:
             df_cache = df_cache.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(
                 drop=True
             )
-            cache.set(chave_frame, df_cache, ttl=self.ttl)
+            # Payload portável (dict de arrays numpy) em vez do frame
+            # picklado: pickle de frame do pandas 3 referencia o pyarrow e
+            # não desserializa em ambiente sem o pacote.
+            cache.set(chave_frame, cache.frame_para_cache(df_cache), ttl=self.ttl)
         df = df_cache
 
         if cnpj:
