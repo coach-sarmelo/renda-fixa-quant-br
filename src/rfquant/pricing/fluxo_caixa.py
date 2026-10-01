@@ -29,7 +29,7 @@ def cupom_periodo(
     vive num único lugar para que consumidores externos (ex.: o Current
     Yield do CLI) usem o mesmo cupom efetivamente pago pelo título.
     """
-    return valor_nominal * ((1 + taxa_cupom_anual) ** (1 / frequencia_cupom) - 1)
+    return float(valor_nominal * ((1 + taxa_cupom_anual) ** (1 / frequencia_cupom) - 1))
 
 
 def gerar_fluxos(
