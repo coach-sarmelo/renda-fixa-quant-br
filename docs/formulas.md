@@ -4,7 +4,7 @@ Toda a matemática implementada no `rfquant`, com as convenções usadas e
 suas limitações. Cada seção corresponde a funções reais do código
 (`src/rfquant/pricing/` e `src/rfquant/comparison/`).
 
-## 1. Fluxo de caixa
+## 1. Fluxo de caixa (cupom composto — padrão STN/ANBIMA)
 
 `gerar_fluxos` (`pricing/fluxo_caixa.py`) monta os pagamentos futuros do
 título:
@@ -13,16 +13,13 @@ título:
   no vencimento.
 - **Com cupom** (`taxa_cupom_anual > 0`): cupons periódicos
   (`frequencia_cupom` por ano, padrão 2 = semestral) de
-  `valor_nominal × taxa_cupom_anual / frequencia_cupom`, mais o principal
-  junto ao último cupom.
 
-> **Limitação declarada:** o cupom é **linear** (`VN × i / f`). O padrão
-> STN/ANBIMA para títulos cupomados é **composto** —
-> `VN × ((1 + i)^(1/f) − 1)` — que daria R$ 48,81 por cupom numa NTN-F de
-> 10% a.a., contra os R$ 50,00 da fórmula linear (desvio de ~2,4% por
-> cupom). A convenção composta é aprimoramento planejado; até lá, o PU de
-> títulos cupomados diverge do oficial também por este motivo, além da
-> aproximação de dias úteis.
+$$\text{cupom} = VN \times \left[(1 + i)^{1/f} - 1\right]$$
+
+  mais o principal pago junto ao último cupom. A convenção do cupom é a
+  **composta** do padrão STN/ANBIMA para títulos cupomados — não a linear
+  (`VN × i / f`). Numa NTN-F de 10% a.a. com cupom semestral, o cupom é
+  R$ 48,81 (1000 × (1,10^(1/2) − 1) = 48,8088...), e não R$ 50,00.
 
 ## 2. Preço Unitário (PU)
 
@@ -35,26 +32,28 @@ Onde:
   menores ou iguais)
 - `du_t` = dias úteis até o fluxo `t`, na base 252 do mercado brasileiro
 
-**A aproximação de dias úteis (dias corridos × 252/365).** O `rfquant` estima os dias úteis por
+**Dias úteis reais.** A contagem usa o calendário real B3/SFN
+(`rfquant.data.calendario`), montado sobre os feriados do
+`pandas-market-calendars` (calendário `'B3'`, consulta offline) com uma
+adaptação documentada de meio período: os pregões de fim de ano
+(24/12 e 31/12 e, quando 31/12 cai num fim de semana, a sexta anterior)
+contam como dias úteis plenos, como no calendário do SFN usado no
+desconto dos títulos públicos. A regra é validada a ±0 (nenhuma
+tolerância) contra 10 casos oficiais — DU publicado e DU derivado dos PUs
+oficiais do Tesouro — registrados em [dados.md](dados.md) e conferidos em
+`tests/test_data_calendario.py`. A antiga aproximação
+dias corridos × 252/365 não é mais usada no núcleo; a medição do erro
+dela permanece em [dados.md](dados.md) como registro histórico.
 
-$$du = \text{round}\left(dc \times \frac{252}{365}\right)$$
-
-onde `dc` é o número de dias corridos (mínimo 1). É uma aproximação de
-proporcionalidade: ela acerta a média de longo prazo, mas ignora onde os
-feriados caem. O Tesouro oficial desconta pelos dias úteis **reais** do
-calendário brasileiro, então o PU calculado diverge do oficial — e o erro
-**cresce com o prazo** (tabelas medidas em [dados.md](dados.md), seção
-"Limitação medida da aproximação de dias úteis (252/365)"). Para prazos curtos a divergência é
-pequena (tipicamente < 1 dia útil); para prazos de anos ela se acumula.
-
-Implementação: `pu.calcular` (`pricing/pu.py`).
+Implementação: `pu.calcular` (`pricing/pu.py`) e `calendario.dias_uteis`
+(`data/calendario.py`).
 
 ## 3. Duration de Macaulay
 
 $$D_{mac} = \frac{\sum_{t=1}^{n} t_{anos} \cdot \frac{FC_t}{(1+y)^{t_{anos}}}}{PU}$$
 
-O prazo médio ponderado dos fluxos de caixa, em anos. Implementação:
-`duration.macaulay`.
+O prazo médio ponderado dos fluxos de caixa, em anos, com
+`t_anos = du_t / 252`. Implementação: `duration.macaulay`.
 
 ## 4. Duration Modificada
 
@@ -66,7 +65,39 @@ $$\Delta PU \approx -D_{mod} \cdot \Delta y \cdot PU$$
 
 Implementação: `duration.modificada`.
 
-## 5. Yield to Maturity (YTM)
+## 5. DV01 (Dollar Value of a Basis Point)
+
+Variação absoluta do PU (em R$) para um choque de +1 ponto-base
+(+0,01%) na taxa:
+
+$$DV01 = \left|PU(y) - PU(y + 0{,}0001)\right|$$
+
+Calculado por **re-precificação** (diferença finita) — captura a
+não-linearidade preço × taxa que a aproximação linear ignora. Quando o PU
+e a Duration Modificada já estão calculados, há a aproximação rápida:
+
+$$DV01 \approx D_{mod} \cdot PU \cdot 0{,}0001$$
+
+menos precisa para taxas altas ou prazos longos. Implementação:
+`risco.dv01` (re-precificação) e `risco.dv01_rapido` (aproximação), em
+`pricing/risco.py`.
+
+## 6. Convexidade e variação de 2ª ordem
+
+Curvatura da relação preço × taxa (segunda derivada normalizada pelo PU),
+em forma fechada na convenção brasileira base 252:
+
+$$C = \frac{1}{PU \cdot (1+y)^2} \sum_{t=1}^{n} t \cdot (t+1) \cdot \frac{FC_t}{(1+y)^t}$$
+
+onde `t = du_t / 252` (prazo em anos). A convexidade corrige a
+aproximação linear da duration — variação percentual do PU de 2ª ordem:
+
+$$\frac{\Delta PU}{PU} \approx -D_{mod} \cdot \Delta y + \frac{1}{2} \cdot C \cdot (\Delta y)^2$$
+
+Implementação: `risco.convexidade` e `risco.variacao_pu`
+(`pricing/risco.py`).
+
+## 7. Yield to Maturity (YTM)
 
 Dado um PU de mercado, resolve-se a taxa que iguala preço e fluxos:
 
@@ -77,20 +108,22 @@ intervalo de busca inicial de −5% a 50% a.a. expandido automaticamente
 quando necessário (PUs com ágio ou deságio extremos). Implementação:
 `ytm.calcular` (`pricing/ytm.py`).
 
-## 6. Current Yield
+## 8. Current Yield
 
 $$CY = \frac{\text{cupom anual (em R\$)}}{PU}$$
 
 Rendimento de cupom sobre o preço, sem considerar amortização do principal.
 Implementação: `current_yield.calcular`.
 
-## 7. Marcação a Mercado
+## 9. Marcação a Mercado
 
 ### Aproximação linear (`marktomarket.aproximada`)
 
 $$PU_{mercado} \approx PU_{compra} \cdot [1 - D_{mod} \cdot (y_{mercado} - y_{compra})]$$
 
-Válida para variações pequenas de taxa (< 1 p.p.).
+Válida para variações pequenas de taxa (< 1 p.p.) e no instante da
+compra — parte de `PU_compra` e ignora o carrego entre a compra e a data
+atual.
 
 ### Exata (`marktomarket.exata`)
 
@@ -104,7 +137,7 @@ A variação é `pu_mercado − pu_curva` (absoluta e percentual), com a
 duration modificada e os dias úteis decorridos no resultado. A função
 `marktomarket.curva` aplica o mesmo cálculo a uma lista de títulos.
 
-## 8. Tabela Regressiva de IR
+## 10. Tabela Regressiva de IR
 
 | Prazo (dias corridos) | Alíquota |
 |----------------------|----------|
@@ -117,7 +150,7 @@ Produtos isentos: LCI, LCA, CRI, CRA e debêntures incentivadas
 (Lei 12.431). Implementação: `ir.aliquota`, `ir.ir_devido`, `ir.calcular`
 (`comparison/ir.py`).
 
-## 9. IOF Regressivo
+## 11. IOF Regressivo
 
 Aplicável apenas a resgates com prazo < 30 dias. No 1º dia, 96% do
 rendimento é consumido por IOF; no 29º, 3%; a partir do 30º dia, zero.
@@ -126,7 +159,7 @@ A tabela completa dia a dia está em `comparison/ir.py` (`IOF_TABELA`).
 Na função de alto nível `ir.calcular`, a ordem de tributação é:
 primeiro IOF, depois IR sobre o rendimento restante.
 
-## 10. Taxa Equivalente entre Isento e Tributado
+## 12. Taxa Equivalente entre Isento e Tributado
 
 Dado um produto tributado com taxa bruta `y_trib` e alíquota `α` do prazo:
 
@@ -149,7 +182,7 @@ Ex.: 110% do CDI com CDI a 13,0% a.a. → 14,3% a.a. Implementação:
 `taxa_equivalente.cdi_para_taxa_anual` (e a inversa
 `taxa_anual_para_cdi`).
 
-## 11. Relação de Fisher (Prefixado ↔ IPCA+)
+## 13. Relação de Fisher (Prefixado ↔ IPCA+)
 
 $$(1 + y_{prefixado}) = (1 + y_{real}) \cdot (1 + \pi_{esperado})$$
 
@@ -173,18 +206,31 @@ com `m` capitalizações por ano (padrão 2). Implementação:
 `curva_juros.taxa_efetiva_para_nominal` e a inversa
 `taxa_nominal_para_efetiva`.
 
-## 12. Curva de Juros (ETTJ)
+## 14. Curva de Juros (ETTJ)
 
 A classe `ETTJ` (`pricing/curva_juros.py`) interpola a estrutura a termo a
-partir de pontos `(prazo em anos, taxa anual)`:
+partir de pontos `(prazo em anos, taxa anual)`.
 
-### Interpolação linear
+### Flat-forward (padrão B3/ANBIMA) — método default
+
+Assume o forward **constante** entre vértices consecutivos: o fator de
+desconto é interpolado log-linearmente entre os nós `t₁` e `t₂` que
+cercam o prazo `τ`:
+
+$$(1 + r(\tau))^{\tau} = (1 + r_1)^{t_1} \cdot \left[\frac{(1 + r_2)^{t_2}}{(1 + r_1)^{t_1}}\right]^{\frac{\tau - t_1}{t_2 - t_1}}$$
+
+É o **default** da classe (`metodo="flat_forward"`) — o padrão de
+interpolação da curva de juros da B3/ANBIMA, sem oportunidades de
+arbitragem entre vértices. Para prazo fora do intervalo dos nós, usa a
+taxa do nó mais próximo (extrapolação flat).
+
+### Interpolação linear (disponível)
 
 $$y(\tau) = y_1 + (y_2 - y_1) \cdot \frac{\tau - \tau_1}{\tau_2 - \tau_1}$$
 
 Simples e robusta; não produz curva suave entre pontos distantes.
 
-### Nelson-Siegel
+### Nelson-Siegel (disponível)
 
 $$y(\tau) = \beta_0 + \beta_1 \cdot \frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} + \beta_2 \cdot \left[\frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} - e^{-\tau/\lambda}\right]$$
 
@@ -195,7 +241,7 @@ fallback **não é** a interpolação linear: o código fixa uma curva flat na
 
 A ETTJ também expõe o fator de desconto `(1 + y(τ))^(−τ)`.
 
-## 13. Convenção de taxa líquida na comparação (limitação declarada)
+## 15. Convenção de taxa líquida na comparação (limitação declarada)
 
 O comando `rfq comparar` e `taxa_equivalente.taxa_liquida_anual` aplicam o
 IR de forma **linear**:
@@ -208,6 +254,15 @@ alíquota aplicada continua sendo a do resgate, o que é uma aproximação —
 em horizontes curtos a diferença para o cálculo composto pode ser
 perceptível. É uma limitação conhecida e declarada, não um erro de
 implementação.
+
+A variante **composta** — `taxa_equivalente.taxa_liquida_anual_composta` —
+é exata para horizontes `t ≠ 1` ano: o IR incide uma única vez, no
+resgate, sobre o ganho acumulado:
+
+$$y_{total} = 1 + (1-\alpha)\cdot\left((1+y_{bruta})^{t}-1\right), \qquad y_{a.a.} = y_{total}^{1/t}-1$$
+
+com `t = prazo_dias/365` (dias corridos, a mesma régua da tabela
+regressiva do IR); em `t = 1` ano as duas convenções coincidem.
 
 ## Referências
 

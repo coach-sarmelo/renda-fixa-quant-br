@@ -77,13 +77,23 @@ du = round(170 × 252/365) = 117; PU = 1000/(1,105)^(117/252) = 954,70.
 O PU oficial de 954,32 implica du oficial = 252·ln(1000/954,32)/ln(1,105) =
 118,01 → **118 dias úteis reais** — 1 DU de diferença explica o erro.
 
-### Limitação medida da aproximação de dias úteis (252/365)
+### Medição HISTÓRICA (pré-calendário real): erro da aproximação de dias úteis (252/365)
 
-O núcleo (`pu.calcular`, `src/rfquant/pricing/pu.py`) estima dias úteis por
-dias corridos × 252/365 (ver [formulas.md](formulas.md)); o PU oficial
-do Tesouro desconta pelos dias úteis **reais** do calendário brasileiro
-(com feriados). O erro relativo do PU resultante **cresce com o prazo** —
-medido na data-base 30/06/2026 (só 1 dos 5 LTNs fica dentro de 1e-3):
+> **Registro histórico.** A medição abaixo foi feita quando o núcleo ainda
+> estimava dias úteis por dias corridos × 252/365. **Hoje o núcleo usa o
+> calendário real** B3/SFN (`rfquant.data.calendario`, feriados do
+> `pandas-market-calendars` com adaptação documentada de meio período de
+> fim de ano), validado a ±0 contra os dias úteis oficiais registrados
+> nesta página e na bateria de calendário dos testes — ver
+> [formulas.md](formulas.md). O trabalho de medição permanece preservado
+> abaixo como o registro que motivou a mudança; não descreve o
+> comportamento atual.
+
+O núcleo (`pu.calcular`, `src/rfquant/pricing/pu.py`) estimava dias úteis
+por dias corridos × 252/365; o PU oficial do Tesouro desconta pelos dias
+úteis **reais** do calendário brasileiro (com feriados). O erro relativo
+do PU resultante **crescia com o prazo** — medido na data-base 30/06/2026
+(só 1 dos 5 LTNs ficava dentro de 1e-3):
 
 | Vencimento | Taxa compra | PU oficial | `pu.calcular` (aprox. 252/365) | Erro rel. | du aprox. | du oficial* |
 |---|---|---|---|---|---|---|
@@ -96,11 +106,14 @@ medido na data-base 30/06/2026 (só 1 dos 5 LTNs fica dentro de 1e-3):
 \* du oficial = expoente implícito ao inverter o PU oficial
 (du = 252·ln(1000/PU)/ln(1+y)) — chega a 9 DU de desvio no prazo de 5,5 anos.
 
-É esse crescimento que motivou fixar a data-base da fixture de regressão em
-15/07/2024 (a última com ≥ 3 LTNs de prazo curto suficiente). Corrigir a
-raiz exige calendário real de feriados (hoje no radar, sem data); a
-tolerância 1e-3 da regressão **não muda** e a fixture só é regravada quando
-a fórmula de PU mudar (mesmo padrão de cabeçalho de auditoria).
+Foi esse crescimento que motivou fixar a data-base da fixture de regressão
+de LTN em 15/07/2024 (a última com ≥ 3 LTNs de prazo curto suficiente) e
+que motivou o calendário real, hoje implementado. A tolerância 1e-3 da
+regressão **não muda** e a fixture só é regravada quando a fórmula de PU
+muda (mesmo padrão de cabeçalho de auditoria). Com o núcleo no calendário
+real e o cupom composto STN/ANBIMA, a regressão NTN-F (8 datas-base de
+2026, `tests/fixtures/tesouro_regressao_ntnf.csv`) fecha dentro da
+tolerância de 1e-3.
 
 ### brapi.dev — não utilizável hoje (exige plano pago para renda fixa)
 
@@ -153,11 +166,11 @@ IPCA) seguem apenas como referência externa, no radar de integração (ver
 | CVM (CSV) | Arquivos grandes: informe mensal ~11 MB/mês e cadastro `cad_fi.csv` ~17,1 MB — baixados sob demanda, com cache em disco (TTL 24 h) |
 | Debêntures | Não há API pública consolidada (ANBIMA requer assinatura) |
 | CDB / LCI / LCA | Não há API centralizada; o usuário informa as taxas |
-| Núcleo de pricing vs Tesouro | Dias úteis pela aproximação dias corridos × 252/365: erro do PU vs oficial cresce com o prazo — 5,11e-4 a 4,80e-3 nos 5 LTNs da data-base 30/06/2026 (seção "Limitação medida da aproximação de dias úteis (252/365)"); calendário real de feriados está no radar |
+| Núcleo de pricing vs Tesouro | Usa o calendário real de dias úteis (`rfquant.data.calendario`). A medição do erro da antiga aproximação dias corridos × 252/365 (5,11e-4 a 4,80e-3 nos 5 LTNs da data-base 30/06/2026) está preservada como registro histórico na seção "Medição HISTÓRICA (pré-calendário real)" |
 
 ## Próximos passos
 
-- [ ] Calendário brasileiro real de feriados para dias úteis exatos (remove a limitação da aproximação 252/365)
+- [x] Calendário brasileiro real de feriados para dias úteis exatos — feito: o núcleo usa `rfquant.data.calendario` (a medição da antiga aproximação 252/365 permanece como registro histórico)
 - [ ] Demais séries macro (Selic meta, IPCA) via SGS/BCB como providers
 - [ ] Scraper do portal do Tesouro Direto como **fonte contingencial — planejada, não implementada** (só seria acionada se o CSV oficial deixasse de funcionar)
 - [ ] Integração com ANBIMA para debêntures

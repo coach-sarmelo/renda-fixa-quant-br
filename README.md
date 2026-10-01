@@ -17,8 +17,9 @@
 
 | Módulo | O que faz | Onde |
 |--------|-----------|------|
-| **Precificação** | PU, duration (Macaulay e modificada) e Current Yield na CLI (`rfq tesouro precificar`); YTM e marcação a mercado (linear e exata) via biblioteca | CLI e biblioteca |
-| **Curva de juros** | Interpolação da ETTJ (linear / Nelson-Siegel), conversões nominal↔efetiva e pré↔IPCA+ | Biblioteca |
+| **Precificação** | PU (cupom composto, padrão STN/ANBIMA), duration (Macaulay e modificada) e Current Yield na CLI (`rfq tesouro precificar`); YTM e marcação a mercado (linear e exata) via biblioteca | CLI e biblioteca |
+| **Risco** | DV01 (re-precificação para +1 bp e aproximação D_mod×PU×0,0001), convexidade (forma fechada base 252) e variação de PU de 2ª ordem (Duration + Convexidade) | CLI (`rfq tesouro precificar`) e biblioteca |
+| **Curva de juros** | ETTJ com flat-forward (padrão B3/ANBIMA) como método default; interpolação linear e Nelson-Siegel disponíveis; conversões nominal↔efetiva e pré↔IPCA+ | Biblioteca |
 | **Comparação** | IR regressivo + IOF, taxa equivalente entre produtos isentos e tributados | CLI e biblioteca |
 | **Dados** | Tesouro Direto (CSV oficial do Tesouro Transparente), CDI (série SGS/BCB) e fundos (informes da CVM) — fontes oficiais, sem token | CLI e biblioteca |
 | **Interfaces** | CLI (`rfq`), notebooks Jupyter e biblioteca Python | — |
@@ -67,13 +68,16 @@ rfq comparar --cdb-cdi 110 --cdi-auto --prazo 720
 rfq fundos resumo --cnpj 00.000.000/0000-00 --mes 2026-08
 ```
 
-Exemplo de saída do `precificar` (a data de referência é sempre a data atual):
+Exemplo de saída do `precificar` (executado em 2026-10-01; a data de
+referência é sempre a data atual):
 
 ```
-PU:              R$ 1,013.73
-Duration Mac:   6.7261 anos
-Duration Mod:   6.3334
-Current Yield:  5.9187%
+PU:              R$ 1,012.67
+Duration Mac:   6.6626 anos
+Duration Mod:   6.2737
+DV01:           R$ 0.6350 / bp
+Convexidade:    52.2252
+Current Yield:  5.9250%
 ```
 
 > **Sobre a opção `--fonte`:** o valor padrão é `auto` — um mapa declarado
@@ -147,7 +151,7 @@ make format   # formata com ruff
 ```
 src/rfquant/
 ├── data/            # Providers (Tesouro, SGS/BCB, CVM) + cache em disco
-├── pricing/         # PU, duration, YTM, marcação a mercado, curva de juros
+├── pricing/         # PU, duration, DV01, convexidade, YTM, marcação a mercado, curva de juros
 ├── comparison/      # IR, IOF, taxa equivalente
 ├── cli.py           # Interface de linha de comando (rfq)
 ├── relatorio.py     # Relatório determinístico (Markdown)
@@ -160,15 +164,9 @@ explícitas e dados oficiais — nunca de fontes não auditáveis. Detalhes em
 
 ## Limitações que vale a pena conhecer
 
-- **Dias úteis aproximados:** o núcleo estima dias úteis por
-  `dias corridos × 252/365`; o Tesouro oficial usa o calendário real. O erro
-  do PU cresce com o prazo — tabelas medidas em [dados.md](docs/dados.md).
 - A comparação de taxas aplica o IR de forma linear pela alíquota do prazo
   informado — aproximação exata apenas para horizonte de 1 ano
   ([formulas.md](docs/formulas.md)).
-- **Cupom linear:** o gerador de fluxos usa cupom linear (`VN × i / f`), não
-  o composto do padrão STN/ANBIMA (NTN-F 10% a.a.: R$ 50,00 vs R$ 48,81 por
-  cupom) — [formulas.md](docs/formulas.md).
 - **Console Windows:** em terminais com codepage OEM os acentos podem sair
   quebrados; use Windows Terminal ou `chcp 65001`
   ([uso.md](docs/uso.md)).

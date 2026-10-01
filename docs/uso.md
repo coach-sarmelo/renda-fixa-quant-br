@@ -137,17 +137,20 @@ p = pu.calcular(
 ```
 
 Saída (com `--vencimento 2035-05-15 --taxa 0.062 --cupom 0.06`, executado
-em 2026-09-21):
+em 2026-10-01):
 
 ```
-PU:              R$ 1,013.73
-Duration Mac:   6.7261 anos
-Duration Mod:   6.3334
-Current Yield:  5.9187%
+PU:              R$ 1,012.67
+Duration Mac:   6.6626 anos
+Duration Mod:   6.2737
+DV01:           R$ 0.6350 / bp
+Convexidade:    52.2252
+Current Yield:  5.9250%
 ```
 
-O Current Yield só aparece quando o cupom é maior que zero. As fórmulas e
-a aproximação de dias úteis (dias corridos × 252/365) estão em
+O Current Yield só aparece quando o cupom é maior que zero; DV01 e
+convexidade saem do mesmo comando. As fórmulas e as convenções (cupom
+composto STN/ANBIMA, calendário real de dias úteis) estão em
 [formulas.md](formulas.md).
 
 ### `rfq comparar`
@@ -192,7 +195,7 @@ comando acima (IR de 17,5% para 720 dias):
 A coluna "Equivalente CDB" responde: qual taxa bruta de CDB renderia o
 mesmo líquido? No exemplo, a LCI/LCA isenta a 10,5% equivale a um CDB bruto
 de ~12,73% — melhor que o CDB de 12% oferecido. A convenção de cálculo e
-sua limitação para prazos ≠ 1 ano estão em [formulas.md](formulas.md#13-convenção-de-taxa-líquida-na-comparação-limitação-declarada).
+sua limitação para prazos ≠ 1 ano estão em [formulas.md](formulas.md#15-convenção-de-taxa-líquida-na-comparação-limitação-declarada).
 
 ### `rfq fundos resumo`
 
@@ -413,5 +416,5 @@ make format  # formata com ruff
 | `Fonte '...' desconhecida.` | Valor inválido em `--fonte`. Os valores aceitos são `auto`, `oficial` e `brapi`. |
 | Primeira listagem do dia demora | O CSV oficial (~14,5 MB) está sendo baixado; execuções seguintes leem do cache de 24 h (`~/.rfquant/cache`). |
 | `rfq relatorio gerar --no-offline` termina com erro | Comportamento esperado: não existe geração por IA. Use o padrão (`--offline`). |
-| PU difere do site do Tesouro | Aproximação de dias úteis (dias corridos × 252/365) — o erro cresce com o prazo. Tabelas medidas em [dados.md](dados.md). |
+| PU difere do site do Tesouro | O núcleo usa o calendário real de dias úteis; diferenças residuais ocorrem em caso-limite de data-base — ex.: na véspera de um cupom, o PU oficial exclui o cupom que vence no dia útil seguinte e o núcleo o inclui (medido na fixture de regressão NTN-F, [dados.md](dados.md)). |
 | Acentos quebrados na saída (ex.: `Compara��o`) | O terminal está numa codepage OEM. No Prompt de Comando, rode `chcp 65001` antes da CLI; no PowerShell, `$env:PYTHONUTF8 = "1"`; ou use o Windows Terminal. |
