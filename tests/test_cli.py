@@ -190,6 +190,8 @@ def test_precificar_imprime_pu_durations_e_cy_com_cupom() -> None:
     assert "PU:" in saida
     assert "Duration Mac:" in saida
     assert "Duration Mod:" in saida
+    assert "DV01:" in saida
+    assert "Convexidade:" in saida
     assert "Current Yield:" in saida
 
 

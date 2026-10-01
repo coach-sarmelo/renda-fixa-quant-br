@@ -36,7 +36,8 @@ from rfquant.data.cvm_fundos import (
     rentabilidade_periodo,
 )
 from rfquant.data.fontes import provider_do_dado, rotulo_do_provider
-from rfquant.pricing import current_yield, duration, pu
+from rfquant.pricing import current_yield, duration, pu, risco
+from rfquant.pricing.fluxo_caixa import cupom_periodo
 
 app = typer.Typer(
     name="rfq",
@@ -200,12 +201,21 @@ def tesouro_precificar(
         hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
     )
 
+    d_v01 = risco.dv01(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+    cvx = risco.convexidade(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+
     console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
     console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
     console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
+    console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
+    console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
 
     if cupom > 0:
-        cy = current_yield.calcular(cupom * valor_nominal, p)
+        # Cupom anual efetivo na convenção composta STN/ANBIMA (2 cupons por
+        # ano, a frequência padrão do núcleo de precificação): o mesmo cupom
+        # que gerar_fluxos paga — e não a divisão linear cupom × nominal.
+        cupom_anual = 2 * cupom_periodo(valor_nominal, cupom, 2)
+        cy = current_yield.calcular(cupom_anual, p)
         console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
 
 

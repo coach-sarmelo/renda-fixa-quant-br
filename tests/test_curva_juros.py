@@ -1,4 +1,4 @@
-"""Testes da ETTJ — interpolação linear e Nelson-Siegel."""
+"""Testes da ETTJ — interpolação linear, flat-forward e Nelson-Siegel."""
 
 from __future__ import annotations
 
@@ -68,6 +68,18 @@ def test_pontos_fora_de_ordem_levanta_value_error() -> None:
         ETTJ([(2.0, 0.118), (1.0, 0.115)])
 
 
+def test_taxa_de_no_menor_ou_igual_a_menos_100_levanta_value_error() -> None:
+    """Nó com taxa <= -100% (fator de capitalização nulo ou negativo) ⇒
+    ValueError na construção, com a mesma mensagem do núcleo de PU.
+    Antes da validação, o flat-forward (método default) quebrava com
+    ZeroDivisionError opaco em (fator2 / fator1) ao interpolar sobre o
+    segmento de taxa -100%; com taxa < -100% o pow devolvia complexo."""
+    with pytest.raises(ValueError, match="-100%"):
+        ETTJ([(1.0, -1.0), (2.0, 0.10)])
+    with pytest.raises(ValueError, match="-100%"):
+        ETTJ([(1.0, 0.10), (2.0, -1.5)])
+
+
 @pytest.mark.parametrize(("prazo"), [0.0, -1.0])
 def test_prazo_nao_positivo_levanta_value_error(prazo: float) -> None:
     """Prazo ≤ 0 na consulta ⇒ ValueError."""
@@ -126,3 +138,64 @@ def test_relacao_de_fisher_conecta_pre_e_real_nos_dois_sentidos() -> None:
     real = curva_juros.taxa_pre_para_pos(0.12, 0.05)
     assert real == pytest.approx(1.12 / 1.05 - 1, rel=1e-12)
     assert curva_juros.taxa_pos_para_pre(real, 0.05) == pytest.approx(0.12, rel=1e-12)
+
+
+# ----------------------------------------------------------------------
+# Flat-forward (padrão B3/ANBIMA)
+# ----------------------------------------------------------------------
+def test_flat_forward_reproduz_nos_exatamente() -> None:
+    """Flat-forward reproduz cada nó com tolerância 1e-12."""
+    e = ETTJ(PONTOS, metodo="flat_forward")
+    for prazo, taxa_no in PONTOS:
+        assert e.taxa(prazo) == pytest.approx(taxa_no, abs=1e-12)
+
+
+def test_flat_forward_interpola_sem_arbitragem() -> None:
+    """Taxa interpolada fica entre os nós vizinhos (sem arbitragem)."""
+    e = ETTJ(PONTOS, metodo="flat_forward")
+    taxa_3_5 = e.taxa(3.5)
+    # 3.5 está entre nós 2.0 (11.8%) e 5.0 (12.5%)
+    assert 0.118 <= taxa_3_5 <= 0.125
+
+
+def test_flat_forward_difere_da_linear() -> None:
+    """Flat-forward produz resultado diferente da interpolação linear
+    (senão não houve mudança real)."""
+    e_ff = ETTJ(PONTOS, metodo="flat_forward")
+    e_lin = ETTJ(PONTOS, metodo="linear")
+    # 3.5 anos: os dois métodos diferem (FF é não-linear em taxa)
+    assert e_ff.taxa(3.5) != pytest.approx(e_lin.taxa(3.5), abs=1e-6)
+
+
+def test_flat_forward_forward_constante_entre_vertices() -> None:
+    """Dentro de um segmento, a forward implícita é constante.
+
+    Forward de t a t+dt: f = [(1+r(t+dt))^(t+dt) / (1+r(t))^t]^(1/dt) - 1
+    Em flat-forward, f(t→t+dt) é constante para t ∈ [t₁, t₂)."""
+    e = ETTJ(PONTOS, metodo="flat_forward")
+
+    def forward_1y(t: float) -> float:
+        dt = 0.01
+        r_t = e.taxa(t)
+        r_tdt = e.taxa(t + dt)
+        return ((1 + r_tdt) ** (t + dt) / (1 + r_t) ** t) ** (1 / dt) - 1
+
+    # Dentro do segmento 2→5 anos, a forward deve ser constante
+    f_25 = forward_1y(2.5)
+    f_35 = forward_1y(3.5)
+    f_45 = forward_1y(4.5)
+    assert f_25 == pytest.approx(f_35, rel=1e-6)
+    assert f_35 == pytest.approx(f_45, rel=1e-6)
+
+
+def test_flat_forward_e_default() -> None:
+    """O método padrão agora é flat_forward (padrão B3/ANBIMA)."""
+    e = ETTJ(PONTOS)  # sem metodo explícito
+    assert e.metodo == "flat_forward"
+
+
+def test_flat_forward_extrapolacao_flat() -> None:
+    """Prazo fora do intervalo dos nós: extrapola flat."""
+    e = ETTJ(PONTOS, metodo="flat_forward")
+    assert e.taxa(0.5) == pytest.approx(PONTOS[0][1], abs=1e-12)
+    assert e.taxa(15.0) == pytest.approx(PONTOS[-1][1], abs=1e-12)

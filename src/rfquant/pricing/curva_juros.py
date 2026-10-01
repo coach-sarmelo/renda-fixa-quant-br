@@ -1,14 +1,15 @@
 """Interpolação da Estrutura a Termo da Taxa de Juros (ETTJ).
 
-Implementa dois métodos:
+Implementa três métodos:
+    - Flat-forward (padrão B3/ANBIMA — forward constante entre vértices).
     - Interpolação linear por prazo (simples, robusta).
-    - Nelson-Siegel (paramétrica, suave, padrão de mercado).
+    - Nelson-Siegel (paramétrica, suave, padrão acadêmico).
 
 Uso típico:
     >>> pontos = [(1.0, 0.115), (2.0, 0.118), (5.0, 0.125), (10.0, 0.135)]
-    >>> e = ETTJ(pontos, metodo="nelson_siegel")
+    >>> e = ETTJ(pontos, metodo="flat_forward")
     >>> e.taxa(3.5)  # taxa interpolada para 3,5 anos
-    0.1213...
+    0.1230...
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from typing import Literal
 import numpy as np
 from scipy.optimize import curve_fit
 
-Metodo = Literal["linear", "nelson_siegel"]
+Metodo = Literal["linear", "flat_forward", "nelson_siegel"]
 
 
 @dataclass
@@ -28,11 +29,11 @@ class ETTJ:
 
     Attributes:
         pontos: Lista de tuplas (prazo_em_anos, taxa_anual).
-        metodo: "linear" ou "nelson_siegel".
+        metodo: "flat_forward" (padrão B3), "linear" ou "nelson_siegel".
     """
 
     pontos: list[tuple[float, float]]
-    metodo: Metodo = "linear"
+    metodo: Metodo = "flat_forward"
 
     def __post_init__(self) -> None:
         if len(self.pontos) < 2:
@@ -40,6 +41,11 @@ class ETTJ:
         prazos = [p for p, _ in self.pontos]
         if prazos != sorted(prazos):
             raise ValueError("Pontos devem estar ordenados por prazo crescente.")
+        # Mesmo domínio do núcleo de PU (pu._pu_de_fluxos): taxa <= -100%
+        # torna o fator de capitalização nulo/negativo — o flat-forward
+        # (método default) dividiria por zero na interpolação.
+        if any(t <= -1 for _, t in self.pontos):
+            raise ValueError("Taxa anual deve ser maior que -100%.")
         self._prazos = np.array([p for p, _ in self.pontos], dtype=float)
         self._taxas = np.array([t for _, t in self.pontos], dtype=float)
         self._params: tuple[float, ...] | None = None
@@ -53,11 +59,37 @@ class ETTJ:
             raise ValueError("Prazo deve ser positivo.")
         if self.metodo == "linear":
             return float(np.interp(prazo, self._prazos, self._taxas))
+        if self.metodo == "flat_forward":
+            return self._flat_forward(prazo)
         return self._nelson_siegel(prazo)
 
     def taxa_vetor(self, prazos: np.ndarray | list[float]) -> np.ndarray:
         """Retorna array de taxas para um vetor de prazos."""
         return np.array([self.taxa(float(p)) for p in prazos])
+
+    def _flat_forward(self, prazo: float) -> float:
+        """Interpolação flat-forward (padrão B3/ANBIMA).
+
+        Forward constante entre vértices: o fator de desconto é log-linear
+        entre nós consecutivos. Equivalente a:
+
+            (1 + r(t))^t = (1 + r₁)^t₁ × [(1 + r₂)^t₂ / (1 + r₁)^t₁]^((t - t₁)/(t₂ - t₁))
+
+        Para prazo fora do intervalo dos nós, usa a taxa do nó mais próximo
+        (extrapolação flat, sem arbitragem).
+        """
+        if prazo <= self._prazos[0]:
+            return float(self._taxas[0])
+        if prazo >= self._prazos[-1]:
+            return float(self._taxas[-1])
+        idx = int(np.searchsorted(self._prazos, prazo)) - 1
+        t1, t2 = float(self._prazos[idx]), float(self._prazos[idx + 1])
+        r1, r2 = float(self._taxas[idx]), float(self._taxas[idx + 1])
+        fator1 = (1 + r1) ** t1
+        fator2 = (1 + r2) ** t2
+        alpha = (prazo - t1) / (t2 - t1)
+        fator = fator1 * (fator2 / fator1) ** alpha
+        return float(fator ** (1 / prazo) - 1)
 
     def fator_desconto(self, prazo: float) -> float:
         """Fator de desconto (1 + y)^(-prazo)."""

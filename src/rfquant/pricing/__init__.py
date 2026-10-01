@@ -7,6 +7,7 @@ from rfquant.pricing import (
     fluxo_caixa,
     marktomarket,
     pu,
+    risco,
     ytm,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "fluxo_caixa",
     "marktomarket",
     "pu",
+    "risco",
     "ytm",
 ]

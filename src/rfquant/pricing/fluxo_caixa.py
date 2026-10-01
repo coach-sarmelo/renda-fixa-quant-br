@@ -16,6 +16,22 @@ class Fluxo:
     tipo: str  # "cupom" | "principal"
 
 
+def cupom_periodo(
+    valor_nominal: float,
+    taxa_cupom_anual: float,
+    frequencia_cupom: int,
+) -> float:
+    """Valor pago por cupom, na convenção composta STN/ANBIMA.
+
+        cupom = valor_nominal × [(1 + taxa_cupom_anual)^(1/frequência) - 1]
+
+    É o valor que `gerar_fluxos` insere em cada data de cupom — a fórmula
+    vive num único lugar para que consumidores externos (ex.: o Current
+    Yield do CLI) usem o mesmo cupom efetivamente pago pelo título.
+    """
+    return valor_nominal * ((1 + taxa_cupom_anual) ** (1 / frequencia_cupom) - 1)
+
+
 def gerar_fluxos(
     data_compra: date,
     data_vencimento: date,
@@ -24,6 +40,7 @@ def gerar_fluxos(
     frequencia_cupom: int = 2,
 ) -> list[Fluxo]:
     """Gera a lista de fluxos de caixa de um título.
+    (Utiliza convenção de cupom composto STN/ANBIMA).
 
     Args:
         data_compra: Data de referência (hoje).
@@ -53,7 +70,7 @@ def gerar_fluxos(
         fluxos.append(Fluxo(data=data_vencimento, valor=valor_nominal, tipo="principal"))
         return fluxos
 
-    cupom_valor = valor_nominal * taxa_cupom_anual / frequencia_cupom
+    cupom_valor = cupom_periodo(valor_nominal, taxa_cupom_anual, frequencia_cupom)
     meses_por_cupom = 12 // frequencia_cupom
 
     # Cupons ancorados no vencimento: mês alvo = mês do vencimento - k×meses,
