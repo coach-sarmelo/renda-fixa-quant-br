@@ -145,7 +145,7 @@ Duration Mac:   6.6626 anos
 Duration Mod:   6.2737
 DV01:           R$ 0.6350 / bp
 Convexidade:    52.2252
-Current Yield:  5.9250%
+Current Yield:  5.8386%
 ```
 
 O Current Yield só aparece quando o cupom é maior que zero; DV01 e

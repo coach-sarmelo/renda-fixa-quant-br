@@ -77,7 +77,7 @@ Duration Mac:   6.6626 anos
 Duration Mod:   6.2737
 DV01:           R$ 0.6350 / bp
 Convexidade:    52.2252
-Current Yield:  5.9250%
+Current Yield:  5.8386%
 ```
 
 > **Sobre a opção `--fonte`:** o valor padrão é `auto` — um mapa declarado

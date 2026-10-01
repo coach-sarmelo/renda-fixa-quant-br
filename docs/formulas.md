@@ -1,8 +1,8 @@
 # Fórmulas
 
-Toda a matemática implementada no `rfquant`, com as convenções usadas e
-suas limitações. Cada seção corresponde a funções reais do código
-(`src/rfquant/pricing/` e `src/rfquant/comparison/`).
+A matemática de precificação e comparação implementada no `rfquant`, com
+as convenções usadas e suas limitações. Cada seção corresponde a funções
+reais do código (`src/rfquant/pricing/` e `src/rfquant/comparison/`).
 
 ## 1. Fluxo de caixa (cupom composto — padrão STN/ANBIMA)
 
@@ -112,8 +112,12 @@ quando necessário (PUs com ágio ou deságio extremos). Implementação:
 
 $$CY = \frac{\text{cupom anual (em R\$)}}{PU}$$
 
+O cupom anual é o somatório dos cupons efetivamente pagos no ano, na
+convenção composta da seção 1 — para a frequência padrão (2 semestrais),
+$2 \cdot VN \cdot [(1+i)^{1/2} - 1]$ — e não a divisão linear $VN \cdot i$.
 Rendimento de cupom sobre o preço, sem considerar amortização do principal.
-Implementação: `current_yield.calcular`.
+Implementação: `current_yield.calcular` (o comando `rfq tesouro precificar`
+fornece o cupom anual composto).
 
 ## 9. Marcação a Mercado
 
