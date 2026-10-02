@@ -16,7 +16,7 @@ oficiais do Tesouro registrados em ``docs/dados.md``).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas_market_calendars as mcal
 
@@ -66,3 +66,27 @@ def dias_uteis(inicio: date, fim: date) -> int:
     uteis = {ts.date() for ts in _CALENDARIO.valid_days(inicio, fim)}
     meios = _dias_de_meio_periodo(inicio, fim) - uteis
     return sum(1 for d in uteis if inicio < d <= fim) + len(meios)
+
+
+def _e_dia_util(d: date) -> bool:
+    """``d`` é dia útil pleno ou meio-período de fim de ano contado como útil."""
+    if d.weekday() >= 5:
+        return False
+    if d in _dias_de_meio_periodo(d - timedelta(days=1), d):
+        return True
+    return bool({ts.date() for ts in _CALENDARIO.valid_days(d, d)})
+
+
+def proximo_dia_util(d: date) -> date:
+    """Primeiro dia útil estritamente depois de ``d`` (calendário B3/SFN).
+
+    Salta fins de semana e feriados do calendário ``'B3'``, com os
+    meio-períodos de fim de ano (24/12, 31/12 e a sexta deslocada) contados
+    como úteis — mesma regra de ``dias_uteis``, ver docstring do módulo.
+    Usado pela convenção de liquidação do PU oficial
+    (``pu.fluxos_liquidados``).
+    """
+    candidato = d + timedelta(days=1)
+    while not _e_dia_util(candidato):
+        candidato += timedelta(days=1)
+    return candidato

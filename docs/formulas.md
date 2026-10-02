@@ -32,6 +32,20 @@ Onde:
   menores ou iguais)
 - `du_t` = dias úteis até o fluxo `t`, na base 252 do mercado brasileiro
 
+**Liquidação D+1: cupom na janela sai do preço, resgate fica.** O PU
+publicado pelo Tesouro pressupõe liquidação no próximo dia útil da
+data-base: um CUPOM pago nessa janela pertence ao vendedor e não entra no
+preço do comprador — mas o fluxo final de vencimento permanece embutido
+mesmo na véspera (`pu.fluxos_liquidados`). Regra medida contra o oficial,
+não assumida: em 27.275 linhas NTN-F do CSV oficial (2004–2026), os 162
+casos em que a regra morde melhoram ~10× com o filtro (p.ex. 6,54e-3 vs
+6,87e-2); os 64 casos de data-base na sexta com cupom na segunda provam que
+a janela é D+1 **útil** (erros de 9e-6 a 9,7e-5 contra 4,9e-2 a 5,5e-2 sem o
+filtro); na véspera do vencimento (30/06/2010, venc 01/07/2010) o oficial
+mantém o resgate no PU (excluí-lo daria erro 1,0; mantendo, 3,75e-4). A
+regressão NTN-F cobre o caso da véspera de cupom (30/06/2026: com o filtro,
+erro de 3,24e-6 e 9,39e-5; sem, 4,97e-2).
+
 **Dias úteis reais.** A contagem usa o calendário real B3/SFN
 (`rfquant.data.calendario`), montado sobre os feriados do
 `pandas-market-calendars` (calendário `'B3'`, consulta offline) com uma

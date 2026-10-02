@@ -136,3 +136,15 @@ def test_natal_e_confraternizacao_sao_feriado() -> None:
     """
     assert calendario.dias_uteis(date(2026, 12, 24), date(2026, 12, 29)) == 2
     assert calendario.dias_uteis(date(2026, 12, 30), date(2027, 1, 4)) == 2
+
+
+def test_proximo_dia_util_salta_fim_de_semana_e_feriado() -> None:
+    """Sexta → segunda (fim de semana) e feriado de ano novo no caminho."""
+    assert calendario.proximo_dia_util(date(2026, 1, 2)) == date(2026, 1, 5)
+    assert calendario.proximo_dia_util(date(2026, 12, 31)) == date(2027, 1, 4)
+
+
+def test_proximo_dia_util_conta_meio_periodo_como_util() -> None:
+    """24/12/2026 é meio-período na B3 e dia útil pleno no SFN: a véspera
+    (23/12, quarta) resolve para o próprio 24/12."""
+    assert calendario.proximo_dia_util(date(2026, 12, 23)) == date(2026, 12, 24)

@@ -19,7 +19,12 @@ from __future__ import annotations
 from datetime import date
 
 from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import DU_ANO, _pu_de_fluxos, dias_uteis
+from rfquant.pricing.pu import (
+    DU_ANO,
+    _pu_de_fluxos,
+    dias_uteis,
+    fluxos_liquidados,
+)
 
 
 def dv01(
@@ -48,6 +53,7 @@ def dv01(
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
     )
+    fluxos = fluxos_liquidados(fluxos, data_compra)
     pu_base = _pu_de_fluxos(fluxos, data_compra, taxa_anual)
     pu_chocado = _pu_de_fluxos(fluxos, data_compra, taxa_anual + 0.0001)
     return abs(pu_base - pu_chocado)
@@ -95,6 +101,7 @@ def convexidade(
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
     )
+    fluxos = fluxos_liquidados(fluxos, data_compra)
     pu_valor = _pu_de_fluxos(fluxos, data_compra, taxa_anual)
     if pu_valor <= 0:
         raise ValueError("PU inválido para cálculo de convexidade.")

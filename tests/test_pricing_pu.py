@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from rfquant.pricing import pu
-from rfquant.pricing.fluxo_caixa import gerar_fluxos
+from rfquant.pricing.fluxo_caixa import Fluxo, gerar_fluxos
 
 
 def test_zero_cupom_pu_exato_1e9() -> None:
@@ -94,3 +94,35 @@ def test_dias_uteis_positivo() -> None:
     """Dias úteis entre duas datas deve ser sempre positivo."""
     du = pu.dias_uteis(date(2026, 1, 1), date(2026, 6, 1))
     assert du > 0
+
+
+def test_fluxos_liquidados_aplica_a_regra_de_liquidacao_d1() -> None:
+    """Convenção do PU oficial: cupom pago no dia útil seguinte à data-base
+    pertence ao vendedor (sai do preço); do segundo dia útil em diante, fica.
+    Caso medido: 30/06/2026 × cupom de 01/07/2026 — sem o filtro o erro
+    contra o oficial era 4,97e-2 (regressão NTN-F)."""
+    data_base = date(2026, 6, 30)  # terça; próximo dia útil = 01/07 (quarta)
+    fluxos = [
+        Fluxo(data=date(2026, 7, 1), valor=48.81, tipo="cupom"),
+        Fluxo(data=date(2026, 7, 2), valor=48.81, tipo="cupom"),
+        Fluxo(data=date(2027, 1, 1), valor=1048.81, tipo="principal"),
+    ]
+    liquidados = pu.fluxos_liquidados(fluxos, data_base)
+    assert [f.data for f in liquidados] == [date(2026, 7, 2), date(2027, 1, 1)]
+
+
+def test_fluxos_liquidados_mantem_o_fluxo_final_na_janela_d1() -> None:
+    """Na véspera do vencimento o oficial mantém o resgate no PU — a exceção
+    é só para cupons intermediários. Medido: 30/06/2010 (venc 01/07/2010) —
+    excluir o fluxo final daria erro 1,0 contra o oficial (3,75e-4 mantendo)."""
+    data_base = date(2026, 6, 30)
+    fluxos = [Fluxo(data=date(2026, 7, 1), valor=1048.81, tipo="principal")]
+    assert [f.data for f in pu.fluxos_liquidados(fluxos, data_base)] == [date(2026, 7, 1)]
+
+
+def test_pu_na_vespera_do_vencimento_e_o_fluxo_final_descontado() -> None:
+    """PU a 1 dia útil do vencimento = fluxo final descontado por 1 DU —
+    o comportamento do oficial na véspera (não é zero)."""
+    compra, venc = date(2026, 12, 31), date(2027, 1, 4)  # próximo dia útil de 31/12
+    esperado = 1000.0 / 1.10 ** (1 / 252)
+    assert pu.calcular(compra, venc, 0.10) == pytest.approx(esperado, rel=1e-9)

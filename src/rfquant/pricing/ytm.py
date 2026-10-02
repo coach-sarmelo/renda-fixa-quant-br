@@ -7,7 +7,7 @@ from datetime import date
 from scipy.optimize import brentq
 
 from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import _pu_de_fluxos
+from rfquant.pricing.pu import _pu_de_fluxos, fluxos_liquidados
 
 
 def calcular(
@@ -33,6 +33,9 @@ def calcular(
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
     )
+    # O fluxo final sobrevive à liquidação D+1 (pu.fluxos_liquidados):
+    # há sempre raiz a resolver.
+    fluxos = fluxos_liquidados(fluxos, data_compra)
 
     def f(y: float) -> float:
         return _pu_de_fluxos(fluxos, data_compra, y) - pu_mercado

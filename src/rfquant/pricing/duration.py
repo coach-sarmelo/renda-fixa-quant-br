@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import DU_ANO, _pu_de_fluxos, dias_uteis
+from rfquant.pricing.pu import DU_ANO, _pu_de_fluxos, dias_uteis, fluxos_liquidados
 
 
 def macaulay(
@@ -28,6 +28,10 @@ def macaulay(
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
     )
+    # Numerador e PU sobre o MESMO conjunto liquidado: um cupom pago na
+    # janela D+1 sairia de um lado e ficaria no outro, com duration
+    # inconsistente com o próprio PU.
+    fluxos = fluxos_liquidados(fluxos, data_compra)
     pu = _pu_de_fluxos(fluxos, data_compra, taxa_anual)
     if pu <= 0:
         raise ValueError("PU inválido para cálculo de duration.")

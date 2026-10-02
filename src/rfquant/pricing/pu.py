@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from rfquant.data.calendario import dias_uteis as _dias_uteis_calendario
+from rfquant.data.calendario import proximo_dia_util as _proximo_dia_util_calendario
 from rfquant.pricing.fluxo_caixa import Fluxo, gerar_fluxos
 
 # Número de dias úteis por ano (convenção do mercado brasileiro)
@@ -22,6 +23,29 @@ def dias_uteis(inicio: date, fim: date) -> int:
     (ver ``docs/dados.md``).
     """
     return _dias_uteis_calendario(inicio, fim)
+
+
+def fluxos_liquidados(fluxos: list[Fluxo], data_ref: date) -> list[Fluxo]:
+    """Fluxos que compõem o PU na convenção de liquidação D+1 do oficial.
+
+    O PU publicado pelo Tesouro pressupõe liquidação no próximo dia útil:
+    CUPONS pagos dentro da janela D+1 pertencem ao vendedor e saem do
+    preço — mas o fluxo FINAL (vencimento) permanece embutido mesmo na
+    véspera. Evidências da regressão NTN-F contra o oficial:
+
+        - 30/06/2026 (cupom em 01/07): sem o filtro o núcleo errava
+          4,97e-2; com a exclusão do cupom, a própria data-base fecha a
+          ≤ 1e-5 e entrou na fixture.
+        - 64 data-bases de sexta com cupom na segunda: só a regra D+1
+          ÚTIL (não corrida) fecha — erros de 9e-6 a 9,7e-5 contra
+          4,9e-2 a 5,5e-2 sem o filtro.
+        - 30/06/2010 (venc em 01/07): o oficial mantém o resgate no PU
+          (erro sem filtro 3,75e-4; excluí-lo daria erro 1,0) — por isso
+          o fluxo final fica.
+    """
+    limite = _proximo_dia_util_calendario(data_ref)
+    vencimento = max(f.data for f in fluxos)
+    return [f for f in fluxos if f.data > limite or f.data == vencimento]
 
 
 def calcular(
@@ -44,7 +68,7 @@ def calcular(
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
     )
-    return _pu_de_fluxos(fluxos, data_compra, taxa_anual)
+    return _pu_de_fluxos(fluxos_liquidados(fluxos, data_compra), data_compra, taxa_anual)
 
 
 def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> float:
