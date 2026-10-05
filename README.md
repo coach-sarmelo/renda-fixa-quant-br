@@ -141,6 +141,14 @@ make lint     # ruff + mypy
 make format   # formata com ruff
 ```
 
+O núcleo de precificação é confrontado com a verdade externa: os testes de
+regressão comparam o PU calculado com o `PU Compra Manhã` oficial do Tesouro
+Direto, sobre excertos byte a byte do CSV oficial do Tesouro Transparente.
+Com o cupom composto STN/ANBIMA, o calendário real de dias úteis e a
+liquidação D+1, os erros medidos são **≤ 1,7e-5** (LTN) e **≤ 9,39e-5**
+(NTN-F, pior caso) — metodologia e medições em
+[docs/dados.md](docs/dados.md).
+
 ## Arquitetura
 
 ```

@@ -3,8 +3,8 @@
 A fixture (tests/fixtures/tesouro_regressao_oficial.csv) é um excerto
 byte a byte do CSV oficial (CKAN/Tesouro Transparente) na data-base 15/07/2024:
 5 LTNs. Com o calendário real de dias úteis TODOS os 5
-batem a <= 1e-3 de pu.calcular vs 'PU Compra Manha' (erros medidos <= 1,7e-5);
-sob a aproximação ``dias corridos × 252/365`` batiam 3 de 5 (limitação
+batem a <= 1e-4 de pu.calcular vs 'PU Compra Manha' (erros medidos <= 1,7e-5;
+sob a aproximação ``dias corridos × 252/365`` batiam 3 de 5 — limitação
 medida em docs/dados.md). Aqui o núcleo de pricing é confrontado com a VERDADE
 EXTERNA (PU publicado), nunca com valores derivados do próprio código.
 
@@ -30,12 +30,13 @@ CAMINHO_FIXTURE_REGRESSAO = Path(__file__).parent / "fixtures" / "tesouro_regres
 # 8,5e-4; com o calendário real, a <= 1e-5). Os LTNs de 2029 e 2031, que excediam
 # 1e-3 POR CONSTRUÇÃO na aproximação (3,51e-3 / 4,88e-3 - limitação medida em
 # docs/dados.md), passam a bater com o calendário real - caracterizado em
-# test_ltns_2029_2031_batem_1e_3_apos_calendario_real (não mais "fora do AC":
+# test_ltns_2029_2031_batem_1e_4_apos_calendario_real (não mais "fora do AC":
 # hoje os 5 de 5 estão dentro da tolerância).
 TITULOS_NO_AC = ("01/01/2025", "01/01/2026", "01/01/2027")
 
-# Tolerância relativa do PU contra o oficial.
-TOLERANCIA_PU = 1e-3
+# Tolerância relativa do PU contra o oficial: apertada ao erro medido — o
+# pior dos 5 LTNs fecha a 1,7e-5 (01/01/2031), margem de ~6× sobre o 1e-4.
+TOLERANCIA_PU = 1e-4
 
 
 def _fixture_regressao() -> str:
@@ -108,7 +109,7 @@ def test_linhas_da_fixture_sao_da_data_base_registrada_no_cabecalho() -> None:
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize("vencimento", TITULOS_NO_AC)
 def test_pu_do_nucleo_bate_com_o_oficial(vencimento: str) -> None:
-    """pu.calcular vs 'PU Compra Manha' oficial, rel <= 1e-3.
+    """pu.calcular vs 'PU Compra Manha' oficial, rel <= 1e-4.
 
     A taxa anual do núcleo é a fração decimal (o CSV traz % a.a.: 10,50 ->
     0,1050). O parser hoje devolve float64 (verificado; a conversão float()
@@ -126,8 +127,8 @@ def test_pu_do_nucleo_bate_com_o_oficial(vencimento: str) -> None:
     assert pu_teorico == pytest.approx(pu_oficial, rel=TOLERANCIA_PU)
 
 
-def test_pelo_menos_3_ltns_batem_com_o_pu_oficial_a_1e_3() -> None:
-    """>= 3 títulos da data-base batem com o oficial a 1e-3.
+def test_pelo_menos_3_ltns_batem_com_o_pu_oficial_a_1e_4() -> None:
+    """>= 3 títulos da data-base batem com o oficial a 1e-4.
 
     Contrato (">= 3 títulos com PU oficial"): a data-base
     15/07/2024 foi escolhida por ter 3 de 5 LTNs na tolerância (critério
@@ -150,16 +151,15 @@ def test_pelo_menos_3_ltns_batem_com_o_pu_oficial_a_1e_3() -> None:
     assert dentro >= 3
 
 
-def test_ltns_2029_2031_batem_1e_3_apos_calendario_real() -> None:
+def test_ltns_2029_2031_batem_1e_4_apos_calendario_real() -> None:
     """Os LTNs que excediam 1e-3 na aproximação dc × 252/365 (3,51e-3 e
     4,88e-3 - o descolamento do du aproximado crescia com o prazo,
-    docs/dados.md) batem com o oficial a <= 1e-3 com o calendário real.
+    docs/dados.md) batem com o oficial a <= 1e-4 com o calendário real.
 
     A queda do erro é o ganho esperado do calendário real - a raiz do
     desvio era o du aproximado. Medidos com o calendário real: 5,70e-6
-    (01/01/2029, du real 1118) e 1,70e-5 (01/01/2031, du real 1619). A
-    tolerância de 1e-3 não muda - o teste agora a EXIGE onde antes
-    congelava o erro alto.
+    (01/01/2029, du real 1118) e 1,70e-5 (01/01/2031, du real 1619) - o
+    pior caso da fixture, que define a tolerância (1e-4, ~6× de margem).
     Se isto falhar um dia, a fórmula de PU mudou de novo: regravar a fixture
     (mesmo padrão de cabeçalho).
     """

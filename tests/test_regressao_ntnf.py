@@ -7,7 +7,7 @@ Semestrais' — em 9 datas-base de 2026, prazo curto (vencimento a 93 a 305
 dias da data-base). É o primeiro título COM cupom confrontado com a verdade
 externa: com o cupom COMPOSTO da convenção STN/ANBIMA (10% a.a. capitalizado
 semestralmente), o calendário real de dias úteis e a liquidação D+1
-(pu.fluxos_liquidados), TODAS batem a <= 1e-3 de pu.calcular vs 'PU Compra
+(pu.fluxos_liquidados), TODAS batem a <= 5e-4 de pu.calcular vs 'PU Compra
 Manha' (as 8 de prazo curto: erros 8,8e-8 a 1,84e-5). Com cupom LINEAR
 (10%/2 = 5% do nominal por semestre), as de prazo curto dão erro 1,14e-3 a
 2,22e-3 — fora da tolerância: a regressão só fecha com a convenção composta
@@ -62,8 +62,10 @@ DATAS_BASE_NO_AC = (
 # (30/09/2026 — só principal+cupom no vencimento).
 DATAS_BASE_CONTRAFACTUAL_LINEAR = ("02/03/2026", "30/09/2026")
 
-# Tolerância relativa do PU contra o oficial.
-TOLERANCIA_PU = 1e-3
+# Tolerância relativa do PU contra o oficial: apertada ao erro medido — o
+# pior caso da fixture é o 9,39e-5 da liquidação D+1 (venc 2037), margem de
+# ~5× sobre o 5e-4.
+TOLERANCIA_PU = 5e-4
 
 
 def _fixture_regressao() -> str:
@@ -155,7 +157,7 @@ def test_linhas_da_fixture_sao_do_escopo_registrado_no_cabecalho() -> None:
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize("data_base", DATAS_BASE_NO_AC)
 def test_pu_do_nucleo_bate_com_o_oficial(data_base: str) -> None:
-    """pu.calcular vs 'PU Compra Manha' oficial, rel <= 1e-3.
+    """pu.calcular vs 'PU Compra Manha' oficial, rel <= 5e-4.
 
     A taxa anual do núcleo é a fração decimal (o CSV traz % a.a.: 13,24 ->
     0,1324). O cupom é o composto de 10% a.a. com frequência 2 — a
@@ -176,8 +178,8 @@ def test_pu_do_nucleo_bate_com_o_oficial(data_base: str) -> None:
         assert pu_teorico == pytest.approx(pu_oficial, rel=TOLERANCIA_PU)
 
 
-def test_todas_as_linhas_batem_com_o_pu_oficial_a_1e_3() -> None:
-    """As 10 linhas da fixture batem com o oficial a 1e-3.
+def test_todas_as_linhas_batem_com_o_pu_oficial_a_5e_4() -> None:
+    """As 10 linhas da fixture batem com o oficial a 5e-4.
 
     Espelho do contrato da regressão LTN (">= 3 títulos"): lá a contagem
     impedia o trio parametrizado de ficar vacuamente verde; aqui a medição
@@ -228,13 +230,14 @@ def _pu_de_cupom_linear(data_base: date, data_vencimento: date, taxa_anual: floa
 
 @pytest.mark.parametrize("data_base", DATAS_BASE_CONTRAFACTUAL_LINEAR)
 def test_cupom_linear_nao_bate_com_o_oficial(data_base: str) -> None:
-    """Com cupom LINEAR o PU NÃO bate a 1e-3 — e por isso a fixture acima só
+    """Com cupom LINEAR o PU NÃO bate a 5e-4 — e por isso a fixture acima só
     fecha com o cupom COMPOSTO da convenção STN/ANBIMA.
 
     Medido: 2,22e-3 (02/03/2026, dois fluxos) e 1,14e-3 (30/09/2026, um
-    fluxo) — ambos fora da tolerância, contra <= 1,84e-5 do composto nas
-    mesmas linhas. Se um dia isto falhar, ou a fixture mudou (regravar com
-    o mesmo padrão de cabeçalho) ou a fórmula de PU voltou atrás.
+    fluxo) — ambos fora da tolerância com folga (> 2×), contra <= 1,84e-5 do
+    composto nas mesmas linhas. Se um dia isto falhar, ou a fixture mudou
+    (regravar com o mesmo padrão de cabeçalho) ou a fórmula de PU voltou
+    atrás.
     """
     linha = _linha_da_data_base(data_base)
     pu_oficial = float(linha["PU Compra Manha"])

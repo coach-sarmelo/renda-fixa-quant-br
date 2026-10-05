@@ -108,12 +108,14 @@ do PU resultante **crescia com o prazo** — medido na data-base 30/06/2026
 
 Foi esse crescimento que motivou fixar a data-base da fixture de regressão
 de LTN em 15/07/2024 (a última com ≥ 3 LTNs de prazo curto suficiente) e
-que motivou o calendário real, hoje implementado. A tolerância 1e-3 da
-regressão **não muda** e a fixture só é regravada quando a fórmula de PU
-muda (mesmo padrão de cabeçalho de auditoria). Com o núcleo no calendário
-real e o cupom composto STN/ANBIMA, a regressão NTN-F (8 datas-base de
-2026, `tests/fixtures/tesouro_regressao_ntnf.csv`) fecha dentro da
-tolerância de 1e-3.
+que motivou o calendário real, hoje implementado. Com o calendário real e o
+cupom composto STN/ANBIMA, os erros medidos caem para ≤ 1,7e-5 (os 5 LTNs)
+e ≤ 9,39e-5 (NTN-F, pior caso = liquidação D+1) — as tolerâncias dos testes
+de regressão foram apertadas ao erro medido: 1e-4 (LTN) e 5e-4 (NTN-F),
+margem de ~5–6×. A fixture só é regravada quando a fórmula de PU muda
+(mesmo padrão de cabeçalho de auditoria). A regressão NTN-F (9 datas-base
+de 2026, `tests/fixtures/tesouro_regressao_ntnf.csv`) fecha dentro da
+tolerância de 5e-4.
 
 ### brapi.dev — não utilizável hoje (exige plano pago para renda fixa)
 

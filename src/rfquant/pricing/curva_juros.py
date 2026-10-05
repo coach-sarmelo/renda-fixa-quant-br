@@ -14,11 +14,12 @@ Uso típico:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import OptimizeWarning, curve_fit
 
 Metodo = Literal["linear", "flat_forward", "nelson_siegel"]
 
@@ -132,14 +133,21 @@ class ETTJ:
             [1.0, 0.5, 0.5, 30.0],
         )
         try:
-            params, _ = curve_fit(
-                self._ns_func,
-                self._prazos,
-                self._taxas,
-                p0=p0,
-                bounds=bounds,
-                maxfev=10_000,
-            )
+            # Com poucos vértices os parâmetros do NS são pouco identificados
+            # (Jacobiano quase degenerado) e o curve_fit avisa que a matriz de
+            # covariância não é estimável — o ajuste em si segue válido (os nós
+            # são reproduzidos a 1e-3 no teste do método). O aviso seria ruído
+            # para todo consumidor da opção, então é silenciado aqui, só no fit.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", OptimizeWarning)
+                params, _ = curve_fit(
+                    self._ns_func,
+                    self._prazos,
+                    self._taxas,
+                    p0=p0,
+                    bounds=bounds,
+                    maxfev=10_000,
+                )
             self._params = tuple(float(p) for p in params)
         except Exception:
             # Fallback: curva flat na última taxa (β1 = β2 = 0) se o fit falhar
