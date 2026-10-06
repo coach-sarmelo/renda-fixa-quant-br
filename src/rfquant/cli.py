@@ -220,20 +220,12 @@ def tesouro_precificar(
         raise typer.Exit(code=1) from None
     hoje = date.today()
 
-    # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
-    # digitado — --valor-nominal não se aplica e é ignorado com aviso.
-    if vna is not None:
-        if valor_nominal != 1000.0:
-            console.print(
-                "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
-                "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
-            )
-        _precificar_ipca(hoje, venc, taxa, cupom, vna)
-        return
-
     # Guarda de magnitude (não-bloqueante): taxa/cupom > 1.0 sugere
     # percentual (6.2) digitado onde se espera decimal (0.062) — muda a
-    # magnitude 100x. Avisa e prossegue com o valor informado.
+    # magnitude 100x. Avisa e prossegue com o valor informado. Vale nos DOIS
+    # caminhos (genérico e IPCA+): no modo --vna a taxa real da NTN-B é
+    # decimal (0.05-0.09), e sem esta guarda o erro de unidade sairia
+    # silencioso como saída absurda.
     suspeitos = [
         f"--{nome} {valor}" for nome, valor in (("taxa", taxa), ("cupom", cupom)) if valor > 1.0
     ]
@@ -244,6 +236,17 @@ def tesouro_precificar(
             + ", ".join(suspeitos)
             + ". Prosseguindo com o valor informado."
         )
+
+    # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
+    # digitado — --valor-nominal não se aplica e é ignorado com aviso.
+    if vna is not None:
+        if valor_nominal != 1000.0:
+            console.print(
+                "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
+                "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
+            )
+        _precificar_ipca(hoje, venc, taxa, cupom, vna)
+        return
 
     p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
     d_mac = duration.macaulay(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)

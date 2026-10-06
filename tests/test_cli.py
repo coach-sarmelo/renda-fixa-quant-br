@@ -249,6 +249,34 @@ def test_precificar_taxa_percentual_emite_aviso_e_prossegue() -> None:
     assert "PU:" in saida
 
 
+def test_precificar_taxa_percentual_no_modo_vna_tambem_avisa() -> None:
+    """A guarda de magnitude vale no modo --vna (IPCA+): taxa real de NTN-B é
+    decimal (0.05-0.09), então --taxa 6.2 com --vna deve emitir o mesmo aviso
+    amarelo — o erro de unidade mais provável do modo novo não pode sair
+    silencioso como saída absurda."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "2035-05-15",
+            "--taxa",
+            "6.2",
+            "--cupom",
+            "0.06",
+            "--vna",
+            "4500.00",
+        ],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "Aviso" in saida
+    assert "decimal" in saida
+    assert "PU:" in saida
+    assert "Cotação:" in saida
+
+
 def test_precificar_vna_com_cupom_imprime_cotacao_pu_metricas_e_cy() -> None:
     """Modo IPCA+ (--vna com --cupom 0.06 = NTN-B): PU pela taxa real,
     linha extra de cotação em % do VNA, durations, DV01, convexidade e
