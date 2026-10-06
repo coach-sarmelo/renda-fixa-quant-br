@@ -62,6 +62,54 @@ dela permanece em [dados.md](dados.md) como registro histórico.
 Implementação: `pu.calcular` (`pricing/pu.py`) e `calendario.dias_uteis`
 (`data/calendario.py`).
 
+### NTN-B (Tesouro IPCA+): cotação e VNA
+
+O Tesouro IPCA+ é negociado por uma **cotação em % do VNA** (Valor Nominal
+Atualizado pelo IPCA); o PU pago na liquidação é reconstruído a partir do VNA
+do dia. O módulo `ntnb` separa as duas camadas reutilizando a matemática
+desta seção: os fluxos são gerados sobre a **base 100** e descontados pela
+**taxa real** `r` (IPCA+ 6,2% a.a. → r = 0,062):
+
+$$\text{cotação} = \sum_{t=1}^{n} \frac{FC_t^{(100)}}{(1 + r)^{du_t / 252}}$$
+
+Os cupons da NTN-B são os semestrais compostos da seção 1 — 6% a.a. →
+**2,956301 por semestre por 100 de VNA** — mais o resgate de 100 no
+vencimento, com as datas ancoradas no vencimento (venc 15/08 → cupons 15/02
+e 15/08; venc 15/05 → 15/05 e 15/11). O PU em reais vem do VNA do dia:
+
+$$PU = VNA \times \frac{\text{cotação}}{100}$$
+
+A **NTN-B Principal** (sem cupons) é o caso `taxa_cupom_anual = 0`: a
+cotação reduz à fórmula exata da STN, $100 / (1 + r)^{du/252}$.
+
+A liquidação D+1 desta seção é herdada: `ntnb.cotacao` aplica
+`pu.fluxos_liquidados` — o cupom pago na janela do próximo dia útil sai da
+cotação. A regressão contra o oficial mediu os casos de data-base 15/xx no
+fim de semana: a janela é a do **pagamento útil** (na sexta 13/02/2026, o
+cupom de domingo 15/02 paga na segunda 16/02 — e é ele que sai do preço).
+Nas 4 datas-base de véspera útil de cupom da fixture, o oficial publica o
+PU Compra SEM o cupom da janela e o PU Venda COM ele — visível nos próprios
+dados (13/02/2026, NTN-B 15/08/2026: PU Compra 4.518,23 < PU Venda 4.646,84
+apesar da taxa de venda MAIOR).
+
+**Evidência da regressão** (`tests/fixtures/tesouro_regressao_ntnb.csv`): o
+CSV oficial não publica o VNA da NTN-B, então o confronto com a verdade
+externa é pela **razão de PUs**, |PU_Compra/PU_Venda −
+cot_compra/cot_venda| / (PU_Compra/PU_Venda), com o filtro D+1 só no
+numerador. Nas 16 linhas (12 NTN-B + 4 NTN-B Principal) de 8 datas-base de
+2024–2026, prazos de 46 a 12.942 dias corridos, o erro medido é de
+**3,447e-4 a 1,082e-3** (15 de 16 ≤ 1e-3; a exceção é a sexta 13/02/2026, o
+dia em que o viés do PU Venda oficial é maior). A tolerância é 5e-3 (~4,6× o
+pior caso), e não mais apertada, porque o resíduo tem viés multiplicativo de
++4,2e-4 de mediana consistente com o PU Venda oficial referenciado à
+liquidação — absorvido na tolerância, não corrigido na fórmula. Metodologia,
+escolha por medição e controles negativos em [dados.md](dados.md).
+
+Implementação: `ntnb.cotacao` (cotação em % do VNA) e `ntnb.calcular`
+(PU = VNA × cotação/100), em `pricing/ntnb.py`. Na CLI, `rfq tesouro
+precificar --vna <VNA_do_dia>` — com `--cupom 0.06` para a NTN-B e sem cupom
+para a NTN-B Principal.
+
 ## 3. Duration de Macaulay
 
 $$D_{mac} = \frac{\sum_{t=1}^{n} t_{anos} \cdot \frac{FC_t}{(1+y)^{t_{anos}}}}{PU}$$

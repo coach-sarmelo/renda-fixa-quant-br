@@ -77,6 +77,74 @@ du = round(170 × 252/365) = 117; PU = 1000/(1,105)^(117/252) = 954,70.
 O PU oficial de 954,32 implica du oficial = 252·ln(1000/954,32)/ln(1,105) =
 118,01 → **118 dias úteis reais** — 1 DU de diferença explica o erro.
 
+### Fixture de regressão da NTN-B (razão de PUs)
+
+`tests/fixtures/tesouro_regressao_ntnb.csv` é um excerto byte a byte do
+mesmo CSV oficial CKAN (path acima), capturado em 2026-10-06 (arquivo
+inteiro: 177.028 linhas desde 31/12/2004 — 44.064 da NTN-B, 'Tesouro IPCA+
+com Juros Semestrais', e 18.900 da NTN-B Principal, 'Tesouro IPCA+'). São
+**16 linhas em 8 datas-base de 2024 a 2026** (15/02/2024, 14/08/2024,
+10/03/2025, 14/08/2025, 13/02/2026, 14/05/2026, 30/06/2026 e 05/10/2026),
+uma dupla por data-base — 12 NTN-B + 4 Principal — com prazos de 46 dias
+corridos (NTN-B 15/08/2026 na base 30/06/2026) a 12.942 (NTN-B 15/08/2060
+na base 10/03/2025) e 4 datas-base de véspera útil de cupom (14/08/2024,
+14/08/2025, 14/05/2026 e 13/02/2026 — cupom de domingo 15/02, pagamento na
+segunda 16/02).
+
+**Por que a razão de PUs, e não o PU absoluto: o CSV não publica o VNA.** A
+coluna 'PU Base Manha' é **igual a 'PU Venda Manha'** em 10.128/10.128
+linhas IPCA+ do escopo 2024–2026 (16/16 da fixture) — é o PU do lado da
+venda, não um valor nominal atualizado. Usá-la como VNA NÃO replica o PU
+oficial: erro medido de 8,882e-3 a 8,156e-1 nas 16 linhas (mediana 1,148e-1;
+0 de 691 datas-base a ≤ 1e-3 no escopo) — controle negativo do teste. O que
+a fixture permite calibrar com verdade externa é a razão entre os dois lados
+do spread:
+
+$$\text{erro} = \frac{|PU_C/PU_V - \text{cot}_C/\text{cot}_V|}{PU_C/PU_V}$$
+
+com as cotações sobre base 100 (cupom composto de 6% a.a., calendário real
+de dias úteis, desconto a (1+r)^(du/252) pela taxa REAL) e a liquidação D+1
+SÓ no numerador: nas vésperas úteis de cupom o oficial publica PU Compra SEM
+o cupom da janela D+1 e PU Venda COM ele.
+
+**Escolha das datas-base por medição** (nunca presumida): validação integral
+do escopo 2024–2026 (6.237 linhas de NTN-B em 691 datas-base + 3.891 da
+Principal). Nas 10.078 linhas sem cupom na janela D+1, a razão fecha com
+mediana 4,165e-4, p95 8,343e-4 e máximo 2,595e-3 (98,1% ≤ 1e-3; 96,5% das
+datas-base); nas 50 linhas D+1 (11 datas-base: 14/02, 14/05, 14/08 e 14/11
+de 2024 e 2025, 13/02, 14/05 e 14/08 de 2026 — quando o cupom 15/xx cai no
+fim de semana, a janela é a do pagamento útil), mediana 4,132e-4 e máximo
+1,302e-3. Erros medidos na fixture (B = NTN-B, Pr = NTN-B Principal):
+
+| Data-base | Dupla eleita | Erros rel. |
+|---|---|---|
+| 15/02/2024 | B 15/08/2026 (912 d) · B 15/08/2050 (9.678 d) | 4,747e-4 · 4,758e-4 |
+| 14/08/2024 | B 15/08/2032 (véspera) · Pr 15/05/2035 | 3,447e-4 · 3,467e-4 |
+| 10/03/2025 | B 15/08/2026 (523 d) · B 15/08/2060 (12.942 d) | 7,748e-4 · 7,387e-4 |
+| 14/08/2025 | B 15/08/2030 (véspera) · Pr 15/08/2050 | 3,735e-4 · 3,501e-4 |
+| 13/02/2026 | B 15/08/2026 (véspera, 183 d) · B 15/05/2055 | 1,082e-3 · 9,668e-4 |
+| 14/05/2026 | B 15/05/2037 (véspera) · Pr 15/05/2029 | 5,063e-4 · 5,227e-4 |
+| 30/06/2026 | B 15/08/2026 (46 d) · B 15/08/2060 | 5,384e-4 · 3,999e-4 |
+| 05/10/2026 | B 15/08/2030 · Pr 15/05/2035 | 5,094e-4 · 5,040e-4 |
+
+**Tolerância 5e-3** — ~4,6× o pior caso medido (1,082e-3) —, e não 1e-4 nem
+1e-3, porque o resíduo do escopo tem viés multiplicativo de +4,18e-4 de
+mediana (99,7% das linhas positivas; +6,25e-4 nas sextas) consistente com o
+PU Venda oficial referenciado à data de liquidação — descontar o lado da
+venda no próximo dia útil reduziria o viés a +1,35e-4. O viés é do oficial,
+não do núcleo: absorvido na tolerância, não corrigido na fórmula.
+
+**Controles negativos medidos** (o que a razão de fato discrimina): (i) o PU
+Base como VNA — 8,882e-3 a 8,156e-1, as 16/16 linhas fora; (ii) nas 4
+vésperas de cupom, o filtro D+1 nos DOIS lados (2,902e-2 a 3,275e-2) ou em
+NENHUM (2,887e-2 a 3,245e-2), ambos ~6–7× a tolerância. O cupom LINEAR
+(3,0 por semestre por 100 de VNA), que discrimina o PU absoluto da NTN-F,
+NÃO discrimina a razão — medido 3,467e-4 a 1,501e-3, dentro de 5e-3: um
+shift multiplicativo no cupom sobe numerador e denominador juntos.
+
+A fixture só é regravada quando a fórmula de cotação/PU da NTN-B mudar
+(mesmo padrão de cabeçalho de auditoria).
+
 ### Medição HISTÓRICA (pré-calendário real): erro da aproximação de dias úteis (252/365)
 
 > **Registro histórico.** A medição abaixo foi feita quando o núcleo ainda

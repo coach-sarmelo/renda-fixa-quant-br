@@ -110,6 +110,7 @@ Opções:
 | `--taxa` | Taxa anual em decimal (ex.: `0.062` = 6,2% a.a.) | obrigatória |
 | `--valor-nominal` | Valor de face | 1000.0 |
 | `--cupom` | Cupom anual em decimal (0 = zero-cupom) | 0.0 |
+| `--vna` | VNA do dia — ativa o modo NTN-B (Tesouro IPCA+): cotação em % do VNA e PU = VNA × cotação/100 (`--cupom 0.06` = NTN-B; sem cupom = NTN-B Principal) | — |
 
 > **Atenção às convenções de unidade — elas diferem entre comandos.**
 > `tesouro precificar --taxa` espera **decimal** (`0.062` = 6,2%), enquanto
@@ -153,6 +154,55 @@ convexidade saem do mesmo comando. As fórmulas e as convenções (cupom
 composto STN/ANBIMA, calendário real de dias úteis) estão em
 [formulas.md](formulas.md).
 
+### Precificar NTN-B (Tesouro IPCA+) com `--vna`
+
+Títulos IPCA+ são negociados por cotação em % do VNA: a opção `--vna` ativa
+o modo NTN-B, que acrescenta a linha de cotação ao PU. O VNA do dia não é
+buscado automaticamente — informe-o na opção (o site do Tesouro Direto
+publica o VNA atualizado de cada título).
+
+NTN-B (com juros semestrais de 6% a.a.):
+
+```
+rfq tesouro precificar --vencimento 2035-05-15 --taxa 0.062 --cupom 0.06 --vna 4500.00
+```
+
+Saída (executado em 2026-10-06; a data de referência é sempre a data atual):
+
+```
+PU:              R$ 4,560.26
+Cotação:        101.3392 % do VNA
+Duration Mac:   6.6507 anos
+Duration Mod:   6.2625
+DV01:           R$ 2.8547 / bp
+Convexidade:    52.0742
+Current Yield:  5.8345%
+```
+
+NTN-B Principal (sem `--cupom` — e, por isso, sem Current Yield):
+
+```
+rfq tesouro precificar --vencimento 2035-05-15 --taxa 0.062 --vna 4500.00
+```
+
+Saída (mesma data):
+
+```
+PU:              R$ 2,691.62
+Cotação:        59.8138 % do VNA
+Duration Mac:   8.5437 anos
+Duration Mod:   8.0449
+DV01:           R$ 2.1644 / bp
+Convexidade:    72.2951
+```
+
+PU = VNA × cotação/100 (no exemplo, 4.560,26 = 4500 × 101,3392/100);
+duration e convexidade saem sobre a base 100 (métricas por unidade de
+preço — a escala do VNA cancela) e o DV01 é a diferença finita de +1 bp no
+PU em reais. `--valor-nominal` não se aplica neste modo: se informado, é
+ignorado com aviso. Fórmulas e evidência de regressão em
+[formulas.md](formulas.md) e [dados.md](dados.md).
+
 ### `rfq comparar`
 
 Compara produtos de renda fixa pelo líquido de IR.
@@ -190,6 +240,11 @@ comando acima (IR de 17,5% para 720 dias):
 │ CDB     │   12.0000% │      9.9000% │        12.0000% │ não    │
 │ Tesouro │   11.8000% │      9.7350% │        11.8000% │ não    │
 └─────────┴────────────┴──────────────┴─────────────────┴────────┘
+
+Material de caráter informativo: apresenta a comparação calculada dos produtos
+informados, líquida de IR, e não constitui oferta, proposta de investimento ou
+forma de captar recursos junto ao público.
+Referência normativa: Resolução CVM 20/2021.
 ```
 
 A coluna "Equivalente CDB" responde: qual taxa bruta de CDB renderia o
@@ -416,5 +471,5 @@ make format  # formata com ruff
 | `Fonte '...' desconhecida.` | Valor inválido em `--fonte`. Os valores aceitos são `auto`, `oficial` e `brapi`. |
 | Primeira listagem do dia demora | O CSV oficial (~14,5 MB) está sendo baixado; execuções seguintes leem do cache de 24 h (`~/.rfquant/cache`). |
 | `rfq relatorio gerar --no-offline` termina com erro | Comportamento esperado: não existe geração por IA. Use o padrão (`--offline`). |
-| PU difere do site do Tesouro | O núcleo usa o calendário real de dias úteis; diferenças residuais ocorrem em caso-limite de data-base — ex.: na véspera de um cupom, o PU oficial exclui o cupom que vence no dia útil seguinte e o núcleo o inclui (medido na fixture de regressão NTN-F, [dados.md](dados.md)). |
+| PU difere do site do Tesouro | O núcleo segue as convenções do PU oficial — calendário real de dias úteis, cupom composto STN/ANBIMA e liquidação D+1 (o cupom pago na janela do próximo dia útil sai do preço, como no oficial); as regressões contra PUs oficiais fecham nas tolerâncias de 1e-4 (LTN) e 5e-4 (NTN-F) ([dados.md](dados.md)). Regra e evidência em [formulas.md](formulas.md). |
 | Acentos quebrados na saída (ex.: `Compara��o`) | O terminal está numa codepage OEM. No Prompt de Comando, rode `chcp 65001` antes da CLI; no PowerShell, `$env:PYTHONUTF8 = "1"`; ou use o Windows Terminal. |

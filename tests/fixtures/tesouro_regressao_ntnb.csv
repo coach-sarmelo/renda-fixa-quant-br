@@ -1,0 +1,25 @@
+# Fixture de regressão da NTN-B por razão de PUs com valores OFICIAIS do Tesouro Direto (cabeçalho de auditoria).
+# path: https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv
+# data-base: 15/02/2024, 14/08/2024, 10/03/2025, 14/08/2025, 13/02/2026, 14/05/2026, 30/06/2026, 05/10/2026 — 8 datas-base de 2024 a 2026 escolhidas por medição sobre o CSV completo (177.028 linhas desde 31/12/2004): em cada uma, uma dupla NTN-B + NTN-B Principal (ou duas NTN-B) com prazos de 46 dias corridos (B 15/08/2026 na base 30/06/2026) a 12.942 (B 15/08/2060 na base 10/03/2025) batendo na razão de PUs a <= 1,082e-3 (7 de 8 datas-base com máximo <= 1e-3; a exceção é a sexta 13/02/2026, cupom pagando na segunda útil).
+# data de captura: 2026-10-06
+# versão da API: CKAN sem versionamento; schema do CSV inalterado desde 31/12/2004 (8 colunas, `;`, decimal `,`)
+# excisão: linhas cuja Data Base é uma das 8 do cabeçalho e Tipo Titulo ∈ {'Tesouro IPCA+ com Juros Semestrais' (a NTN-B do CSV: IPCA+ com cupom semestral composto STN de 6% a.a. → 2,956301 por semestre por 100 de VNA), 'Tesouro IPCA+' (a NTN-B Principal, sem cupom)} com o vencimento eleito da dupla — 16 de 62.964 (44.064 da NTN-B + 18.900 da Principal); cada linha byte a byte, incluindo terminadores LF e o conteúdo ASCII do original, na ordem de aparição do CSV (data-base desc; dentro da data-base, blocos por tipo com os vencimentos na ordem original do arquivo).
+# nota: o CSV NÃO publica o VNA — 'PU Base Manha' é igual a 'PU Venda Manha' em 16/16 linhas da fixture (10.128/10.128 do escopo 2024-2026 medido sobre o CSV completo), então PU_Base × cotação/100 NÃO replica o PU oficial (erro 8,9e-3 a 8,2e-1 nas 16 linhas; mediana 1,148e-1 e 0 de 691 datas-base a <= 1e-3 no escopo). A regressão compara RAZÕES: |PU_Compra/PU_Venda − cot(taxa_compra)/cot(taxa_venda)| / (PU_Compra/PU_Venda), cotações sobre base 100 com cupom composto, calendário real de dias úteis e desconto real a (1+r)^(du/252), com a regra de liquidação D+1 (pu.fluxos_liquidados) SÓ no numerador: nas 4 datas-base de véspera útil de cupom o oficial publica PU Compra SEM o cupom da janela D+1 e PU Venda COM ele — com o filtro também no denominador a razão daria 2,9e-2 a 3,3e-2, fora da tolerância com folga (> 5x). Validação integral do escopo 2024-2026 (10.078 linhas sem cupom na janela D+1): mediana 4,165e-4, p95 8,343e-4, máximo 2,595e-3, 98,1% das linhas <= 1e-3; nas 50 linhas D+1 (11 datas-base) a razão híbrida fecha com mediana 4,132e-4 e máximo 1,302e-3. Tolerância 5e-3, não 1e-4: o resíduo tem viés multiplicativo de +4,2e-4 de mediana (99,7% das linhas positivas; +6,3e-4 nas sextas) consistente com o PU Venda oficial referenciado à data de liquidação — viés do oficial absorvido na tolerância, não corrigido na fórmula.
+# cadência: regravar apenas quando a fórmula de cotação/PU mudar (mesmo padrão de cabeçalho).
+Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;Taxa Venda Manha;PU Compra Manha;PU Venda Manha;PU Base Manha
+Tesouro IPCA+ com Juros Semestrais;15/08/2030;05/10/2026;7,06;7,18;4638,41;4618,21;4618,21
+Tesouro IPCA+;15/05/2035;05/10/2026;6,86;6,98;2695,45;2668,37;2668,37
+Tesouro IPCA+ com Juros Semestrais;15/08/2060;30/06/2026;7,54;7,66;3992,60;3934,26;3934,26
+Tesouro IPCA+ com Juros Semestrais;15/08/2026;30/06/2026;11,27;11,39;4812,53;4809,26;4809,26
+Tesouro IPCA+ com Juros Semestrais;15/05/2037;14/05/2026;7,48;7,60;4217,47;4316,85;4316,85
+Tesouro IPCA+;15/05/2029;14/05/2026;7,88;8,00;3755,01;3740,65;3740,65
+Tesouro IPCA+ com Juros Semestrais;15/05/2055;13/02/2026;7,09;7,21;4092,50;4029,85;4029,85
+Tesouro IPCA+ com Juros Semestrais;15/08/2026;13/02/2026;10,16;10,28;4518,23;4646,84;4646,84
+Tesouro IPCA+ com Juros Semestrais;15/08/2030;14/08/2025;7,58;7,70;4265,88;4377,86;4377,86
+Tesouro IPCA+;15/08/2050;14/08/2025;6,92;7,04;861,33;837,36;837,36
+Tesouro IPCA+ com Juros Semestrais;15/08/2026;10/03/2025;8,19;8,31;4345,53;4335,48;4335,48
+Tesouro IPCA+ com Juros Semestrais;15/08/2060;10/03/2025;7,35;7,47;3750,61;3692,04;3692,04
+Tesouro IPCA+ com Juros Semestrais;15/08/2032;14/08/2024;5,85;5,97;4364,13;4458,32;4458,32
+Tesouro IPCA+;15/05/2035;14/08/2024;5,79;5,91;2365,90;2336,61;2336,61
+Tesouro IPCA+ com Juros Semestrais;15/08/2026;15/02/2024;5,47;5,59;4264,58;4251,14;4251,14
+Tesouro IPCA+ com Juros Semestrais;15/08/2050;15/02/2024;5,63;5,75;4441,91;4370,28;4370,28

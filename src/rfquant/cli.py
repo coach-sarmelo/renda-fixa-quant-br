@@ -36,7 +36,7 @@ from rfquant.data.cvm_fundos import (
     rentabilidade_periodo,
 )
 from rfquant.data.fontes import provider_do_dado, rotulo_do_provider
-from rfquant.pricing import current_yield, duration, pu, risco
+from rfquant.pricing import current_yield, duration, ntnb, pu, risco
 from rfquant.pricing.fluxo_caixa import cupom_periodo
 
 app = typer.Typer(
@@ -164,12 +164,51 @@ def tesouro_listar(
     console.print(tabela)
 
 
+def _precificar_ipca(hoje: date, venc: date, taxa: float, cupom: float, vna: float) -> None:
+    """Saída do modo IPCA+ (`--vna`): NTN-B precificada pela taxa real.
+
+    PU = VNA × cotação/100 (ntnb.calcular); cotação em % do VNA
+    (ntnb.cotacao). Duration e convexidade são calculadas sobre a base
+    100 — métricas por unidade de preço, em que a escala do VNA cancela.
+    O DV01 vem por diferença finita no PU real (re-precificação com
+    +1 bp, mesma filosofia de risco.dv01).
+    """
+    p = ntnb.calcular(hoje, venc, taxa, vna, taxa_cupom_anual=cupom)
+    cot = ntnb.cotacao(hoje, venc, taxa, taxa_cupom_anual=cupom)
+    d_mac = duration.macaulay(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
+    d_mod = duration.modificada(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
+    cvx = risco.convexidade(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
+    d_v01 = abs(p - ntnb.calcular(hoje, venc, taxa + 0.0001, vna, taxa_cupom_anual=cupom))
+
+    console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
+    console.print(f"[bold]Cotação:[/]        {cot:.4f} % do VNA")
+    console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
+    console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
+    console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
+    console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
+
+    if cupom > 0:
+        # Cupom anual em R$ sobre o VNA informado: 2 cupons semestrais
+        # (compostos STN — o mesmo valor que gerar_fluxos paga) por 100 de
+        # VNA, escalados ao VNA real.
+        cupom_anual = vna * 2 * cupom_periodo(100.0, cupom, 2) / 100.0
+        cy = current_yield.calcular(cupom_anual, p)
+        console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
+
+
 @tesouro_app.command("precificar")
 def tesouro_precificar(
     vencimento: Annotated[str, typer.Option(help="Data de vencimento (YYYY-MM-DD)")],
     taxa: Annotated[float, typer.Option(help="Taxa anual em decimal (ex: 0.06 = 6%)")],
     valor_nominal: Annotated[float, typer.Option(help="Valor de face")] = 1000.0,
     cupom: Annotated[float, typer.Option(help="Cupom anual (0 = zero-cupom)")] = 0.0,
+    vna: Annotated[
+        float | None,
+        typer.Option(
+            help="VNA do dia (modo IPCA+/NTN-B): PU = VNA × cotação/100; "
+            "cupom 0 = NTN-B Principal, 0.06 = NTN-B"
+        ),
+    ] = None,
 ) -> None:
     """Precifica um título genérico de renda fixa."""
     try:
@@ -180,6 +219,17 @@ def tesouro_precificar(
         )
         raise typer.Exit(code=1) from None
     hoje = date.today()
+
+    # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
+    # digitado — --valor-nominal não se aplica e é ignorado com aviso.
+    if vna is not None:
+        if valor_nominal != 1000.0:
+            console.print(
+                "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
+                "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
+            )
+        _precificar_ipca(hoje, venc, taxa, cupom, vna)
+        return
 
     # Guarda de magnitude (não-bloqueante): taxa/cupom > 1.0 sugere
     # percentual (6.2) digitado onde se espera decimal (0.062) — muda a

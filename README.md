@@ -12,7 +12,7 @@
 
 | Módulo | O que faz | Onde |
 |--------|-----------|------|
-| **Precificação** | PU (cupom composto, padrão STN/ANBIMA), duration (Macaulay e modificada) e Current Yield na CLI (`rfq tesouro precificar`); YTM e marcação a mercado (linear e exata) via biblioteca | CLI e biblioteca |
+| **Precificação** | PU (cupom composto, padrão STN/ANBIMA), duration (Macaulay e modificada) e Current Yield na CLI (`rfq tesouro precificar`); NTN-B/NTN-B Principal pela cotação em % do VNA — PU = VNA × cotação/100 (`--vna`); YTM e marcação a mercado (linear e exata) via biblioteca | CLI e biblioteca |
 | **Risco** | DV01 (re-precificação para +1 bp e aproximação D_mod×PU×0,0001), convexidade (forma fechada base 252) e variação de PU de 2ª ordem (Duration + Convexidade) | CLI (`rfq tesouro precificar`) e biblioteca |
 | **Curva de juros** | ETTJ com flat-forward (padrão B3/ANBIMA) como método default; interpolação linear e Nelson-Siegel disponíveis; conversões nominal↔efetiva e pré↔IPCA+ | Biblioteca |
 | **Comparação** | IR regressivo + IOF, taxa equivalente entre produtos isentos e tributados | CLI e biblioteca |

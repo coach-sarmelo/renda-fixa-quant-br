@@ -12,7 +12,7 @@ Fonte oficial (Tesouro Transparente/CKAN — CSV público, sem token)
 Camada de dados e cache (providers + diskcache, download ≤ 1×/24 h)
 │
 ▼
-Núcleo quant (PU, duration, YTM, current yield, marcação a mercado, ETTJ)
+Núcleo quant (PU, duration, DV01, convexidade, YTM, current yield, marcação a mercado, ETTJ)
 │
 ▼
 Comparação (IR regressivo, IOF, taxa equivalente)
@@ -90,7 +90,7 @@ src/rfquant/
 │   ├── tesouro_oficial.py  #   CSV oficial do Tesouro Transparente
 │   ├── tesouro_direto.py   #   Provider brapi (não utilizável hoje)
 │   └── cache.py     #   Cache HTTP (diskcache)
-├── pricing/         # PU, duration, YTM, current yield, marcação, curva
+├── pricing/         # PU, duration, DV01, convexidade, YTM, current yield, marcação, curva
 ├── comparison/      # IR regressivo, IOF, taxa equivalente
 ├── cli.py           # Interface de linha de comando (rfq)
 ├── relatorio.py     # Relatório determinístico (Markdown)

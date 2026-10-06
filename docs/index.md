@@ -63,15 +63,17 @@ Guia completo com saídas reais e todos os parâmetros: [Uso detalhado](uso.md).
 
 ## O que existe hoje e o que está no radar
 
-**Hoje:** precificação (PU, duration, YTM, current yield, marcação a
-mercado), curva de juros (interpolação linear e Nelson-Siegel), tributação
-(IR regressivo + IOF), comparação de produtos, dados oficiais do Tesouro
-Direto e relatório determinístico de carteira de exemplo.
+**Hoje:** precificação (PU com cupom composto STN/ANBIMA, duration, YTM,
+current yield, marcação a mercado), risco (DV01 e convexidade), curva de
+juros (ETTJ com flat-forward como método default; interpolação linear e
+Nelson-Siegel disponíveis), tributação (IR regressivo + IOF), comparação
+de produtos, calendário real de dias úteis, dados oficiais (Tesouro
+Direto, CDI via SGS/BCB, fundos via CVM) e relatório determinístico de
+carteira de exemplo.
 
-**No radar (planejado, sem data):** calendário brasileiro real de feriados
-para dias úteis exatos, séries macro (Selic/CDI/IPCA) via SGS/BCB, fonte
-contingencial de scraping do portal do Tesouro Direto e integração com
-outras fontes (ver [dados.md](dados.md)).
+**No radar (planejado, sem data):** demais séries macro (Selic meta, IPCA)
+via SGS/BCB, fonte contingencial de scraping do portal do Tesouro Direto e
+integração com outras fontes (ver [dados.md](dados.md)).
 
 Não existe, e não está planejado para agora: recomendação automática de
 investimentos, otimização de carteira, dashboard ou API web.

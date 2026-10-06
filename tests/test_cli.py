@@ -249,6 +249,110 @@ def test_precificar_taxa_percentual_emite_aviso_e_prossegue() -> None:
     assert "PU:" in saida
 
 
+def test_precificar_vna_com_cupom_imprime_cotacao_pu_metricas_e_cy() -> None:
+    """Modo IPCA+ (--vna com --cupom 0.06 = NTN-B): PU pela taxa real,
+    linha extra de cotação em % do VNA, durations, DV01, convexidade e
+    Current Yield com o cupom em R$ sobre o VNA informado."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "2035-05-15",
+            "--taxa",
+            "0.062",
+            "--cupom",
+            "0.06",
+            "--vna",
+            "4500.00",
+        ],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "PU:" in saida
+    assert "Cotação:" in saida
+    assert "% do VNA" in saida
+    assert "Duration Mac:" in saida
+    assert "Duration Mod:" in saida
+    assert "DV01:" in saida
+    assert "Convexidade:" in saida
+    assert "Current Yield:" in saida
+
+
+def test_precificar_vna_sem_cupom_e_ntnb_principal() -> None:
+    """--vna sem --cupom = NTN-B Principal: cotação e PU sem Current Yield
+    (CY é exclusivo de cupom > 0, como no caminho sem --vna)."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "2035-05-15",
+            "--taxa",
+            "0.062",
+            "--vna",
+            "4500.00",
+        ],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "Cotação:" in saida
+    assert "PU:" in saida
+    assert "Current Yield" not in saida
+
+
+def test_precificar_sem_vna_nao_menciona_cotacao_nem_vna() -> None:
+    """Sem --vna o caminho é o de sempre (título genérico por valor de
+    face): nada de cotação ou VNA na saída — o modo IPCA+ é opt-in."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "2035-05-15",
+            "--taxa",
+            "0.062",
+            "--cupom",
+            "0.06",
+        ],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "PU:" in saida
+    assert "Cotação:" not in saida
+    assert "% do VNA" not in saida
+
+
+def test_precificar_vna_ignora_valor_nominal_com_aviso() -> None:
+    """--vna junto de --valor-nominal: o valor de face não se aplica no
+    modo IPCA+ — aviso amarelo, ignorado e exit 0 (não é erro)."""
+    resultado = runner.invoke(
+        app,
+        [
+            "tesouro",
+            "precificar",
+            "--vencimento",
+            "2035-05-15",
+            "--taxa",
+            "0.062",
+            "--cupom",
+            "0.06",
+            "--vna",
+            "4500.00",
+            "--valor-nominal",
+            "100.0",
+        ],
+    )
+    assert resultado.exit_code == 0
+    saida = resultado.stdout
+    assert "Aviso" in saida
+    assert "--valor-nominal" in saida
+    assert "Cotação:" in saida  # o modo IPCA+ roda normalmente apesar do aviso
+
+
 # ----------------------------------------------------------------------
 # rfq comparar
 # ----------------------------------------------------------------------
