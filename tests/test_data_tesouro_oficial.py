@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import requests
-from conftest import RespostaFake
+from conftest import RespostaFake, repetir_se_rede_instavel
 
 from rfquant.data import cache
 from rfquant.data.tesouro_oficial import TesouroOficialProvider
@@ -87,6 +87,7 @@ def test_historico_taxas_filtra_titulo_e_periodo(provider_oficial: TesouroOficia
 # padrão pelos addopts `-m 'not network'` do pyproject)
 # ----------------------------------------------------------------------
 @pytest.mark.network
+@repetir_se_rede_instavel()
 def test_provider_oficial_endpoint_responde() -> None:
     """Endpoint público do Tesouro responde com ≥1 título real, no contrato.
 

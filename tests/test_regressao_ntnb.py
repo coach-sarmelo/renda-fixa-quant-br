@@ -159,8 +159,7 @@ def _cotacao_sem_filtro(
         frequencia_cupom=2,
     )
     return sum(
-        f.valor / (1 + taxa_real) ** (pu.dias_uteis(data_base, f.data) / 252)
-        for f in fluxos
+        f.valor / (1 + taxa_real) ** (pu.dias_uteis(data_base, f.data) / 252) for f in fluxos
     )
 
 

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import time
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import diskcache as dc
 import pandas as pd
@@ -13,6 +16,7 @@ import pytest
 import requests
 
 from rfquant.data import cache
+from rfquant.data.cvm_fundos import RedeIndisponivel
 from rfquant.data.tesouro_direto import TesouroDiretoProvider
 
 CAMINHO_SAMPLE = Path(__file__).parent / "fixtures" / "tesouro_sample.csv"
@@ -161,3 +165,76 @@ def relogio(monkeypatch) -> _Relogio:
 def provider_tesouro_teste() -> TesouroDiretoProvider:
     """Provider apontando para host fake — só faz sentido com ``fetch_mockado``."""
     return TesouroDiretoProvider(token="token-teste", base_url="http://teste.local")
+
+
+# ----------------------------------------------------------------------
+# Tolerância a instabilidade transitória de rede (testes ``network``)
+# ----------------------------------------------------------------------
+def get_resiliente(
+    url: str, timeout: float = 30.0, tentativas: int = 3, pausa: float = 5.0
+) -> requests.Response:
+    """GET que repete diante de instabilidade transitória do endpoint.
+
+    Timeout, falha de conexão e resposta 5xx gastam uma tentativa e esperam
+    ``pausa`` segundos; a última tentativa devolve a resposta ou propaga a
+    exceção como estão — indisponibilidade persistente continua falhando.
+    Respostas 4xx nunca são repetidas: quebra real não é instabilidade.
+    """
+    tentativa = 0
+    while True:
+        tentativa += 1
+        ultima = tentativa == tentativas
+        try:
+            resposta = requests.get(url, timeout=timeout)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if ultima:
+                raise
+            time.sleep(pausa)
+            continue
+        if resposta.status_code < 500 or ultima:
+            return resposta
+        time.sleep(pausa)
+
+
+def _e_falha_transitoria(exc: BaseException) -> bool:
+    """A exceção é plausivelmente transitória de rede, não defeito.
+
+    Timeout e falha de conexão sempre contam; HTTP 5xx sim, 4xx não. Os
+    providers embrulham essas falhas em ``ValueError``/exceções próprias via
+    ``raise ... from`` — a causa original na cadeia é o que decide, então
+    quebra de domínio (payload inválido, arquivo não publicado) continua
+    falhando na primeira ocorrência.
+    """
+    if isinstance(exc, RedeIndisponivel):
+        return True  # o provider da CVM já separou 4xx em InformeNaoDisponivel
+    causa: BaseException = exc.__cause__ if exc.__cause__ is not None else exc
+    if isinstance(causa, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+        return True
+    if isinstance(causa, requests.exceptions.HTTPError):
+        status = getattr(causa.response, "status_code", None)
+        return isinstance(status, int) and status >= 500
+    return False
+
+
+def repetir_se_rede_instavel(tentativas: int = 3, pausa: float = 5.0) -> Callable:
+    """Decorador que repete a função enquanto a falha for transitória.
+
+    Mesma política de ``get_resiliente``, para testes que exercitam o
+    provider inteiro (cache, parse e validação inclusos) em vez de um GET
+    isolado: a exceção da última tentativa propaga intocada.
+    """
+
+    def decorador(funcao: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(funcao)
+        def invocacao(*args: Any, **kwargs: Any) -> Any:
+            for indice in range(1, tentativas + 1):
+                try:
+                    return funcao(*args, **kwargs)
+                except (ValueError, requests.RequestException, RedeIndisponivel) as exc:
+                    if indice == tentativas or not _e_falha_transitoria(exc):
+                        raise
+                    time.sleep(pausa)
+
+        return invocacao
+
+    return decorador

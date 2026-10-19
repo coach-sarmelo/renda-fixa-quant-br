@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
-import requests
+from conftest import get_resiliente
 
 README = Path(__file__).resolve().parent.parent / "README.md"
 
@@ -82,6 +82,7 @@ def test_alvos_locais_existem() -> None:
     [a for a in _alvos() if a.startswith(("http://", "https://"))],
 )
 def test_alvos_externos_respondem_200(alvo: str) -> None:
-    """Alvo externo http(s) responde 200 (segue redirecionamento; timeout 30 s)."""
-    resposta = requests.get(alvo, timeout=30)
+    """Alvo externo http(s) responde 200 (segue redirecionamento; timeout 30 s
+    com retentativas diante de instabilidade transitória)."""
+    resposta = get_resiliente(alvo, timeout=30)
     assert resposta.status_code == 200

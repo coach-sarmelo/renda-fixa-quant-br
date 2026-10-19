@@ -16,7 +16,12 @@ from typing import Any
 import pandas as pd
 import pytest
 import requests
-from conftest import CAMINHO_FIXTURE_SGS, RespostaFake, fixture_payload
+from conftest import (
+    CAMINHO_FIXTURE_SGS,
+    RespostaFake,
+    fixture_payload,
+    repetir_se_rede_instavel,
+)
 
 from rfquant.data.sgs_bcb import TTL_SGS, USER_AGENT, SGSProvider
 
@@ -234,6 +239,7 @@ def test_user_agent_explicito_no_fetch(provider_sgs, fetch_sgs_fixture) -> None:
 # freshness de 7 dias.
 # ----------------------------------------------------------------------
 @pytest.mark.network
+@repetir_se_rede_instavel()
 def test_sgs_endpoint_responde_rede_real() -> None:
     """Endpoint vivo do SGS (série 12, CDI) passa na MESMA bateria.
 

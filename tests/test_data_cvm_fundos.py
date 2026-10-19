@@ -47,7 +47,7 @@ from datetime import date
 import pandas as pd
 import pytest
 import requests
-from conftest import FIXTURE_ZIP, RespostaErro, RespostaZip
+from conftest import FIXTURE_ZIP, RespostaErro, RespostaZip, repetir_se_rede_instavel
 
 from rfquant.data import cache
 from rfquant.data.cvm_fundos import (
@@ -584,6 +584,7 @@ def test_metricas_degeneradas_devolvem_zero() -> None:
 # fixture, então falha de endpoint no job semanal é regressão, não expectativa.
 # ----------------------------------------------------------------------
 @pytest.mark.network
+@repetir_se_rede_instavel()
 def test_cvm_endpoint_responde_rede_real(provider_cvm: CVMFundosProvider) -> None:
     """Endpoint vivo da CVM serve o mês FECHADO da fixture, no contrato.
 

@@ -90,9 +90,7 @@ def test_cotacao_exclui_cupom_na_janela_d1() -> None:
     ao vendedor e sai da cotação."""
     data_base = date(2026, 6, 30)
     venc = date(2027, 7, 1)
-    fluxos_brutos = gerar_fluxos(
-        data_base, venc, valor_nominal=100.0, taxa_cupom_anual=0.06
-    )
+    fluxos_brutos = gerar_fluxos(data_base, venc, valor_nominal=100.0, taxa_cupom_anual=0.06)
     # o cupom na janela D+1 existe no bruto — sem ele o teste não provaria nada
     assert any(f.data == date(2026, 7, 1) and f.tipo == "cupom" for f in fluxos_brutos)
 
@@ -142,13 +140,9 @@ def test_cotacao_na_vespera_mantem_o_fluxo_final_na_janela_d1() -> None:
         ),
     ],
 )
-def test_datas_base_ancoradas_no_vencimento(
-    vencimento: date, datas_esperadas: list[date]
-) -> None:
+def test_datas_base_ancoradas_no_vencimento(vencimento: date, datas_esperadas: list[date]) -> None:
     """Cupons ancorados no vencimento caem nas datas-base da NTN-B
     (15/02, 15/05, 15/08, 15/11), com o principal na última."""
-    fluxos = gerar_fluxos(
-        date(2026, 1, 2), vencimento, valor_nominal=100.0, taxa_cupom_anual=0.06
-    )
+    fluxos = gerar_fluxos(date(2026, 1, 2), vencimento, valor_nominal=100.0, taxa_cupom_anual=0.06)
     assert [f.data for f in fluxos] == datas_esperadas
     assert fluxos[-1].tipo == "principal"
