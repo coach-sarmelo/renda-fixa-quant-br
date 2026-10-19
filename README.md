@@ -8,11 +8,6 @@
 
 ---
 
-## Por que este projeto existe
-
-- **104,8 milhões de CPFs** investem em renda fixa no Brasil (vs. ~5,5 milhões em renda variável).
-- Nenhuma ferramenta open source ou SaaS de destaque faz **análise quantitativa séria** de renda fixa nacional.
-
 ## Funcionalidades
 
 | Módulo | O que faz | Onde |
@@ -158,18 +153,6 @@ src/rfquant/
 └── config.py        # Settings (pydantic-settings, lê .env)
 ```
 
-Princípio central: **cálculo determinístico**. Números vêm de fórmulas
-explícitas e dados oficiais — nunca de fontes não auditáveis. Detalhes em
-[Arquitetura](docs/arquitetura.md).
-
-## Limitações que vale a pena conhecer
-
-- A comparação de taxas aplica o IR de forma linear pela alíquota do prazo
-  informado — aproximação exata apenas para horizonte de 1 ano
-  ([formulas.md](docs/formulas.md)).
-- **Console Windows:** em terminais com codepage OEM os acentos podem sair
-  quebrados; use Windows Terminal ou `chcp 65001`
-  ([uso.md](docs/uso.md)).
 
 ## Documentação
 
