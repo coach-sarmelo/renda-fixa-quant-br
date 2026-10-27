@@ -75,14 +75,6 @@ Convexidade:    52.2252
 Current Yield:  5.8386%
 ```
 
-> **Sobre a opção `--fonte`:** o valor padrão é `auto` — um mapa declarado
-> resolve cada dado pela sua fonte oficial (títulos → Tesouro Transparente;
-> CDI → série SGS/BCB; fundos → CVM) e a CLI anuncia a fonte usada ("fonte:
-> oficial"). `--fonte=oficial` continua disponível. `--fonte=brapi` hoje
-> **não é utilizável** (exige plano pago e falha sem `BRAPI_TOKEN`) — a
-> resolução automática nunca o escolhe. Detalhes em
-> [Fontes de dados](docs/dados.md).
-
 ## Configuração (`.env`)
 
 Opcional: copie o exemplo e preencha apenas o que for usar.
@@ -105,15 +97,6 @@ reservadas, sem efeito na prática hoje.
 rfq relatorio gerar --output relatorio.md
 ```
 
-Gera um relatório Markdown **determinístico** de uma carteira de **exemplo**
-(embutida no comando, apenas para demonstrar o formato): sem rede, sem
-chave de API, com o disclaimer regulatório no rodapé. A saída é sempre a
-mesma para o mesmo dia.
-
-A opção `--no-offline` apenas encerra com erro (código 1): não existe
-geração de relatório por IA nesta ferramenta — o único caminho é o
-determinístico. Veja [Uso detalhado](docs/uso.md).
-
 ## Uso como biblioteca
 
 ```python
@@ -133,21 +116,6 @@ print(f"PU: R$ {p:,.2f} | Duration mod: {d_mod:.4f}")
 Mais exemplos (YTM, marcação a mercado, ETTJ, IR, comparação) em
 [Uso detalhado](docs/uso.md), e os notebooks em [`notebooks/`](notebooks/).
 
-## Testes e qualidade
-
-```bash
-make test     # pytest com cobertura
-make lint     # ruff + mypy
-make format   # formata com ruff
-```
-
-O núcleo de precificação é confrontado com a verdade externa: os testes de
-regressão comparam o PU calculado com o `PU Compra Manhã` oficial do Tesouro
-Direto, sobre excertos byte a byte do CSV oficial do Tesouro Transparente.
-Com o cupom composto STN/ANBIMA, o calendário real de dias úteis e a
-liquidação D+1, os erros medidos são **≤ 1,7e-5** (LTN) e **≤ 9,39e-5**
-(NTN-F, pior caso) — metodologia e medições em
-[docs/dados.md](docs/dados.md).
 
 ## Arquitetura
 
@@ -172,7 +140,7 @@ src/rfquant/
 
 ## Disclaimer
 
-Esta ferramenta é **educacional e informacional**. Não constitui consultoria de valores mobiliários nos termos da Resolução CVM nº 20/2021. Não há recomendação personalizada. Consulte um profissional certificado antes de investir.
+Esta ferramenta é **educacional e informacional**. Não constitui consultoria de valores mobiliários.
 
 ## Licença
 
