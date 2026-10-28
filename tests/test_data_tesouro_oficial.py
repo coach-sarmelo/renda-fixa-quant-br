@@ -86,8 +86,11 @@ def test_historico_taxas_filtra_titulo_e_periodo(provider_oficial: TesouroOficia
 # Teste de rede (job de CI semanal; deselecionado na suíte
 # padrão pelos addopts `-m 'not network'` do pyproject)
 # ----------------------------------------------------------------------
+# Tentativa extra em relação ao padrão: a janela do limitador de taxa do CSV
+# é de minutos (medido — Retry-After: 30 não basta), então as esperas 60 s +
+# 120 s + 120 s precisam da 4ª tentativa para cobrir ~5 min antes de desistir.
 @pytest.mark.network
-@repetir_se_rede_instavel()
+@repetir_se_rede_instavel(tentativas=4)
 def test_provider_oficial_endpoint_responde() -> None:
     """Endpoint público do Tesouro responde com ≥1 título real, no contrato.
 

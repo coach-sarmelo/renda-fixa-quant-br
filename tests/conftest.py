@@ -170,15 +170,24 @@ def provider_tesouro_teste() -> TesouroDiretoProvider:
 # ----------------------------------------------------------------------
 # Tolerância a instabilidade transitória de rede (testes ``network``)
 # ----------------------------------------------------------------------
+# Limitador de taxa do CSV do Tesouro (medido em out/2026): janela deslizante
+# por IP de MINUTOS — o Retry-After: 30 que o servidor envia é otimista, então
+# o 429 tem piso de espera próprio e crescente por tentativa.
+PAUSA_429 = 60.0
+TETO_ESPERA = 120.0
+
+
 def get_resiliente(
     url: str, timeout: float = 30.0, tentativas: int = 3, pausa: float = 5.0
 ) -> requests.Response:
     """GET que repete diante de instabilidade transitória do endpoint.
 
     Timeout, falha de conexão e resposta 5xx gastam uma tentativa e esperam
-    ``pausa`` segundos; a última tentativa devolve a resposta ou propaga a
-    exceção como estão — indisponibilidade persistente continua falhando.
-    Respostas 4xx nunca são repetidas: quebra real não é instabilidade.
+    ``pausa`` segundos; 429 (limitação de taxa) espera o maior entre o
+    ``Retry-After`` recebido e o piso crescente de ``PAUSA_429``. A última
+    tentativa devolve a resposta ou propaga a exceção como estão —
+    indisponibilidade persistente continua falhando. Os demais 4xx nunca
+    são repetidos: quebra real não é instabilidade.
     """
     tentativa = 0
     while True:
@@ -191,29 +200,65 @@ def get_resiliente(
                 raise
             time.sleep(pausa)
             continue
+        if resposta.status_code == 429 and not ultima:
+            time.sleep(_espera_429(tentativa, resposta))
+            continue
         if resposta.status_code < 500 or ultima:
             return resposta
         time.sleep(pausa)
 
 
+def _causa_raiz(exc: BaseException) -> BaseException:
+    """A causa original de ``raise ... from`` dos providers (ou a própria)."""
+    return exc.__cause__ if exc.__cause__ is not None else exc
+
+
+def _retry_after(resposta: requests.Response | None) -> float | None:
+    """``Retry-After`` em segundos (formato delta), se presente e válido."""
+    if resposta is None:
+        return None
+    try:
+        return float(resposta.headers.get("Retry-After"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _espera_429(tentativa: int, resposta: requests.Response | None) -> float:
+    """Espera diante de 429: máximo entre Retry-After e piso crescente
+    (``PAUSA_429`` × tentativa), com teto de segurança ``TETO_ESPERA``."""
+    sugerida = _retry_after(resposta) or 0.0
+    return min(max(sugerida, PAUSA_429 * tentativa), TETO_ESPERA)
+
+
 def _e_falha_transitoria(exc: BaseException) -> bool:
     """A exceção é plausivelmente transitória de rede, não defeito.
 
-    Timeout e falha de conexão sempre contam; HTTP 5xx sim, 4xx não. Os
-    providers embrulham essas falhas em ``ValueError``/exceções próprias via
-    ``raise ... from`` — a causa original na cadeia é o que decide, então
-    quebra de domínio (payload inválido, arquivo não publicado) continua
-    falhando na primeira ocorrência.
+    Timeout e falha de conexão sempre contam; HTTP 5xx e 429 (limitação de
+    taxa) sim, demais 4xx não. Os providers embrulham essas falhas em
+    ``ValueError``/exceções próprias via ``raise ... from`` — a causa
+    original na cadeia é o que decide, então quebra de domínio (payload
+    inválido, arquivo não publicado) continua falhando na primeira
+    ocorrência.
     """
     if isinstance(exc, RedeIndisponivel):
         return True  # o provider da CVM já separou 4xx em InformeNaoDisponivel
-    causa: BaseException = exc.__cause__ if exc.__cause__ is not None else exc
+    causa = _causa_raiz(exc)
     if isinstance(causa, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
         return True
     if isinstance(causa, requests.exceptions.HTTPError):
         status = getattr(causa.response, "status_code", None)
-        return isinstance(status, int) and status >= 500
+        return isinstance(status, int) and (status >= 500 or status == 429)
     return False
+
+
+def _espera_do_erro(exc: BaseException, tentativa: int, padrao: float) -> float:
+    """Espera para retentar: 429 usa ``_espera_429``, o resto usa ``padrao``."""
+    causa = _causa_raiz(exc)
+    if isinstance(causa, requests.exceptions.HTTPError):
+        status = getattr(causa.response, "status_code", None)
+        if status == 429:
+            return _espera_429(tentativa, causa.response)
+    return padrao
 
 
 def repetir_se_rede_instavel(tentativas: int = 3, pausa: float = 5.0) -> Callable:
@@ -233,7 +278,7 @@ def repetir_se_rede_instavel(tentativas: int = 3, pausa: float = 5.0) -> Callabl
                 except (ValueError, requests.RequestException, RedeIndisponivel) as exc:
                     if indice == tentativas or not _e_falha_transitoria(exc):
                         raise
-                    time.sleep(pausa)
+                    time.sleep(_espera_do_erro(exc, indice, pausa))
 
         return invocacao
 
