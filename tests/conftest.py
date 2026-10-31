@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import diskcache as dc
 import pandas as pd
@@ -38,14 +38,14 @@ class RespostaFake:
     (``raise_for_status`` + ``json``/``text``). Usar junto com ``fetch_mockado``
     ou direto em ``monkeypatch.setattr(requests, "get", ...)``."""
 
-    def __init__(self, payload: dict, texto: str | None = None) -> None:
+    def __init__(self, payload: Any, texto: str | None = None) -> None:
         self._payload = payload
         self.text = texto if texto is not None else str(payload)
 
     def raise_for_status(self) -> None:
         return None
 
-    def json(self) -> dict:
+    def json(self) -> Any:
         return self._payload
 
 
@@ -55,7 +55,7 @@ def fixture_payload() -> list[dict[str, str]]:
     CLI (``--cdi-auto`` e ``fundos resumo`` sem rede)."""
     linhas = CAMINHO_FIXTURE_SGS.read_text(encoding="utf-8").splitlines()
     corpo = "\n".join(linha for linha in linhas if not linha.startswith("#"))
-    return json.loads(corpo)
+    return cast(list[dict[str, str]], json.loads(corpo))
 
 
 class RespostaZip:

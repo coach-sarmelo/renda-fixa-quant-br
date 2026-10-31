@@ -237,39 +237,47 @@ def tesouro_precificar(
             + ". Prosseguindo com o valor informado."
         )
 
-    # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
-    # digitado — --valor-nominal não se aplica e é ignorado com aviso.
-    if vna is not None:
-        if valor_nominal != 1000.0:
-            console.print(
-                "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
-                "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
-            )
-        _precificar_ipca(hoje, venc, taxa, cupom, vna)
-        return
+    try:
+        # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
+        # digitado — --valor-nominal não se aplica e é ignorado com aviso.
+        if vna is not None:
+            if valor_nominal != 1000.0:
+                console.print(
+                    "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
+                    "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
+                )
+            _precificar_ipca(hoje, venc, taxa, cupom, vna)
+            return
 
-    p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-    d_mac = duration.macaulay(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-    d_mod = duration.modificada(
-        hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
-    )
+        p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+        d_mac = duration.macaulay(
+            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
+        )
+        d_mod = duration.modificada(
+            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
+        )
 
-    d_v01 = risco.dv01(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-    cvx = risco.convexidade(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+        d_v01 = risco.dv01(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
+        cvx = risco.convexidade(
+            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
+        )
 
-    console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
-    console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
-    console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
-    console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
-    console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
+        console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
+        console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
+        console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
+        console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
+        console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
 
-    if cupom > 0:
-        # Cupom anual efetivo na convenção composta STN/ANBIMA (2 cupons por
-        # ano, a frequência padrão do núcleo de precificação): o mesmo cupom
-        # que gerar_fluxos paga — e não a divisão linear cupom × nominal.
-        cupom_anual = 2 * cupom_periodo(valor_nominal, cupom, 2)
-        cy = current_yield.calcular(cupom_anual, p)
-        console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
+        if cupom > 0:
+            # Cupom anual efetivo na convenção composta STN/ANBIMA (2 cupons por
+            # ano, a frequência padrão do núcleo de precificação): o mesmo cupom
+            # que gerar_fluxos paga — e não a divisão linear cupom × nominal.
+            cupom_anual = 2 * cupom_periodo(valor_nominal, cupom, 2)
+            cy = current_yield.calcular(cupom_anual, p)
+            console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
+    except ValueError as erro:
+        console.print(f"[red]Erro ao precificar:[/] {erro}")
+        raise typer.Exit(code=1) from None
 
 
 # ----------------------------------------------------------------------
@@ -595,6 +603,8 @@ def resumo_hoje() -> None:
     try:
         # fonte oficial: 'rfq hoje' funciona sem BRAPI_TOKEN
         tesouro_listar(tipo=None, limite=10, fonte="oficial")
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Erro ao buscar dados:[/] {e}")
 

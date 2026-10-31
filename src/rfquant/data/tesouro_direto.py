@@ -16,6 +16,10 @@ from rfquant.config import settings
 from rfquant.data import cache
 from rfquant.data.base import DataProvider, Titulo
 
+USER_AGENT = (
+    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
+)
+
 
 class TesouroDiretoProvider(DataProvider):
     """Acesso aos dados do Tesouro Direto via brapi.dev."""
@@ -55,7 +59,12 @@ class TesouroDiretoProvider(DataProvider):
         if cached is not None:
             return pd.DataFrame(cached)
 
-        resp = requests.get(url, params=params, timeout=20)
+        resp = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=20,
+        )
         resp.raise_for_status()
         payload = resp.json()
         # A fonte responde tanto com {"indicators": [...]} quanto com a
@@ -74,7 +83,12 @@ class TesouroDiretoProvider(DataProvider):
         if cached is not None:
             return cached
 
-        resp = requests.get(url, params=params, timeout=20)
+        resp = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=20,
+        )
         resp.raise_for_status()
         payload = resp.json()
         # Mesmo contrato do histórico: a fonte responde tanto com

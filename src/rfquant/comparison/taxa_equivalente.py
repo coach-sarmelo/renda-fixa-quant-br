@@ -34,6 +34,8 @@ def cdi_para_taxa_anual(percentual_cdi: float, cdi_anual: float) -> float:
     """
     if percentual_cdi <= 0:
         raise ValueError("Percentual do CDI deve ser positivo.")
+    if cdi_anual <= 0:
+        raise ValueError("CDI deve ser positivo.")
     return percentual_cdi * cdi_anual
 
 
@@ -105,11 +107,15 @@ def tributado_equivalente_a_isento(
 # ----------------------------------------------------------------------
 def pre_para_ipca_mais(prefixado: float, ipca_esperado: float) -> float:
     """Taxa prefixada → taxa real (IPCA+) equivalente (Fisher exata)."""
+    if ipca_esperado <= -1:
+        raise ValueError("IPCA esperado deve ser maior que -100%.")
     return (1 + prefixado) / (1 + ipca_esperado) - 1
 
 
 def ipca_mais_para_pre(ipca_mais: float, ipca_esperado: float) -> float:
     """Taxa real (IPCA+) → taxa prefixada equivalente."""
+    if ipca_esperado <= -1:
+        raise ValueError("IPCA esperado deve ser maior que -100%.")
     return (1 + ipca_mais) * (1 + ipca_esperado) - 1
 
 

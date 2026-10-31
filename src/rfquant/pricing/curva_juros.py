@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Literal
 
 import numpy as np
@@ -40,8 +41,10 @@ class ETTJ:
         if len(self.pontos) < 2:
             raise ValueError("ETTJ precisa de pelo menos 2 pontos.")
         prazos = [p for p, _ in self.pontos]
-        if prazos != sorted(prazos):
-            raise ValueError("Pontos devem estar ordenados por prazo crescente.")
+        if any(p <= 0 for p in prazos):
+            raise ValueError("Prazos devem ser positivos.")
+        if any(p2 <= p1 for p1, p2 in pairwise(prazos)):
+            raise ValueError("Pontos devem ter prazos estritamente crescentes.")
         # Mesmo domínio do núcleo de PU (pu._pu_de_fluxos): taxa <= -100%
         # torna o fator de capitalização nulo/negativo — o flat-forward
         # (método default) dividiria por zero na interpolação.
@@ -169,6 +172,8 @@ def taxa_efetiva_para_nominal(taxa_efetiva: float, periodos: int = 2) -> float:
     """
     if periodos <= 0:
         raise ValueError("Períodos deve ser positivo.")
+    if taxa_efetiva <= -1:
+        raise ValueError("Taxa efetiva deve ser maior que -100%.")
     return float(periodos * ((1 + taxa_efetiva) ** (1 / periodos) - 1))
 
 
@@ -185,9 +190,13 @@ def taxa_pre_para_pos(pre: float, ipca_esperado: float) -> float:
     Relação de Fisher exata:
         (1 + pre) = (1 + real) × (1 + ipca)
     """
+    if ipca_esperado <= -1:
+        raise ValueError("IPCA esperado deve ser maior que -100%.")
     return (1 + pre) / (1 + ipca_esperado) - 1
 
 
 def taxa_pos_para_pre(real: float, ipca_esperado: float) -> float:
     """Converte taxa real (IPCA+) em prefixada equivalente."""
+    if ipca_esperado <= -1:
+        raise ValueError("IPCA esperado deve ser maior que -100%.")
     return (1 + real) * (1 + ipca_esperado) - 1

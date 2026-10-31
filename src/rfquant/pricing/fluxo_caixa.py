@@ -29,6 +29,8 @@ def cupom_periodo(
     vive num único lugar para que consumidores externos (ex.: o Current
     Yield do CLI) usem o mesmo cupom efetivamente pago pelo título.
     """
+    if valor_nominal <= 0:
+        raise ValueError("Valor nominal deve ser positivo.")
     return float(valor_nominal * ((1 + taxa_cupom_anual) ** (1 / frequencia_cupom) - 1))
 
 
@@ -59,6 +61,8 @@ def gerar_fluxos(
     """
     if data_vencimento <= data_compra:
         raise ValueError("Data de vencimento deve ser posterior à data de compra.")
+    if valor_nominal <= 0:
+        raise ValueError("Valor nominal deve ser positivo.")
     if taxa_cupom_anual < 0:
         raise ValueError("Taxa de cupom não pode ser negativa.")
     if frequencia_cupom not in (1, 2, 3, 4, 6, 12):

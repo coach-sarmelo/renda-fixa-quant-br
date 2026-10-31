@@ -49,5 +49,11 @@ def calcular(
         lo = max(2 * lo, -0.99)
         hi *= 2
 
+    if f(lo) * f(hi) > 0:
+        raise ValueError(
+            f"Não foi possível encontrar a YTM para o PU informado (R$ {pu_mercado:,.2f}). "
+            "Verifique se o PU de mercado é compatível com os fluxos do título."
+        )
+
     # float(): brentq não-tipado devolve Any para o mypy.
     return float(brentq(f, lo, hi, xtol=tol, maxiter=200))

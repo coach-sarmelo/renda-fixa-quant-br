@@ -43,6 +43,8 @@ def fluxos_liquidados(fluxos: list[Fluxo], data_ref: date) -> list[Fluxo]:
           (erro sem filtro 3,75e-4; excluí-lo daria erro 1,0) — por isso
           o fluxo final fica.
     """
+    if not fluxos:
+        return []
     limite = _proximo_dia_util_calendario(data_ref)
     vencimento = max(f.data for f in fluxos)
     return [f for f in fluxos if f.data > limite or f.data == vencimento]

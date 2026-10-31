@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,8 @@ def _serializar(obj: Any) -> Any:
         return {k: _serializar(v) for k, v in asdict(obj).items()}
     if isinstance(obj, date):
         return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
     if isinstance(obj, dict):
         return {k: _serializar(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -49,10 +52,16 @@ def _serializar(obj: Any) -> Any:
 def _tabela(itens: list[dict[str, Any]]) -> list[str]:
     """Renderiza uma lista de dicts como tabela Markdown.
 
-    O cabeçalho vem das chaves do primeiro item (ordem de inserção —
-    determinística); item sem uma chave recebe célula vazia.
+    O cabeçalho agrega todas as chaves únicas presentes nos itens
+    (preservando ordem de inserção); item sem uma chave recebe célula vazia.
     """
-    chaves = list(itens[0].keys())
+    chaves: list[str] = []
+    for item in itens:
+        for k in item:
+            if k not in chaves:
+                chaves.append(k)
+    if not chaves:
+        return []
     linhas = [
         "| " + " | ".join(chaves) + " |",
         "| " + " | ".join(["---"] * len(chaves)) + " |",

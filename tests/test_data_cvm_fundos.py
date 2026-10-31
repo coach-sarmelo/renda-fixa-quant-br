@@ -444,6 +444,7 @@ def test_user_agent_explicito_no_fetch(
     default de biblioteca (``python-requests/...``)."""
     provider_cvm.informe_diario(ANO, MES)
     assert fetch_cvm.user_agent == USER_AGENT
+    assert fetch_cvm.user_agent is not None
     assert "rfquant" in fetch_cvm.user_agent
 
 

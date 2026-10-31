@@ -59,6 +59,10 @@ def provider_do_dado(dado: Literal["cdi"]) -> SGSProvider: ...
 def provider_do_dado(dado: Literal["fundos"]) -> CVMFundosProvider: ...
 
 
+@overload
+def provider_do_dado(dado: str) -> ProviderDeclarado: ...
+
+
 def provider_do_dado(dado: str) -> ProviderDeclarado:
     """Instancia a fonte declarada no mapa para o dado informado.
 
@@ -76,7 +80,7 @@ def provider_do_dado(dado: str) -> ProviderDeclarado:
     return fabrica()
 
 
-def rotulo_do_provider(provider: ProviderDeclarado) -> str:
+def rotulo_do_provider(provider: object) -> str:
     """Rótulo da fonte resolvida, para o anúncio na saída ("fonte: <rótulo>").
 
     Provider fora do conjunto declarado ⇒ ``ValueError`` — o anúncio nunca

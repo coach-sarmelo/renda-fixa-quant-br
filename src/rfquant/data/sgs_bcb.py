@@ -82,6 +82,8 @@ class SGSProvider:
         levanta ``ValueError`` com mensagem pt-BR — forma de erro real do SGS
         (``{"erro": ...}``, sondada em 2026-09-23).
         """
+        if inicio > fim:
+            raise ValueError("Data inicial deve ser anterior ou igual à data final.")
         params = {
             "formato": "json",
             "dataInicial": inicio.strftime("%d/%m/%Y"),

@@ -13,6 +13,8 @@ def calcular(cupom_anual: float, pu_mercado: float) -> float:
     Returns:
         Current Yield (ex: 0.05 = 5%).
     """
+    if cupom_anual < 0:
+        raise ValueError("Cupom anual não pode ser negativo.")
     if pu_mercado <= 0:
         raise ValueError("PU de mercado deve ser positivo.")
     return cupom_anual / pu_mercado

@@ -36,6 +36,9 @@ URL_CSV = (
     "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
 )
 TTL_CSV = 86_400  # 24 h: o arquivo troca 1×/dia (~10h)
+USER_AGENT = (
+    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
+)
 
 
 class TesouroOficialProvider(DataProvider):
@@ -64,6 +67,8 @@ class TesouroOficialProvider(DataProvider):
         inicio: date,
         fim: date,
     ) -> pd.DataFrame:
+        if inicio > fim:
+            raise ValueError("Data inicial deve ser anterior ou igual à data final.")
         bruto = self._ler_csv()
         bruto = bruto.assign(
             nome=bruto["Tipo Titulo"] + " " + bruto["Data Vencimento"].dt.year.astype(str)
@@ -100,7 +105,11 @@ class TesouroOficialProvider(DataProvider):
         if df_cache is None:
             texto: str | None = cache.get(self.url)
             if texto is None:
-                resp = requests.get(self.url, timeout=120)
+                resp = requests.get(
+                    self.url,
+                    headers={"User-Agent": USER_AGENT},
+                    timeout=120,
+                )
                 resp.raise_for_status()
                 texto = resp.text
                 cache.set(self.url, texto, ttl=self.ttl)

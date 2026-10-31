@@ -7,6 +7,7 @@ re-precificado HOJE pela taxa de compra — não carrego acumulado.
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -172,7 +173,7 @@ def test_curva_aplica_exata_a_cada_titulo_preservando_ordem_e_defaults() -> None
     entrada; chaves opcionais ausentes assumem os defaults do contrato
     (nominal 1000, cupom 0, 2 cupons/ano) — provado recomputando `exata`
     com os mesmos argumentos e comparando campo a campo."""
-    lote = [
+    lote: list[dict[str, Any]] = [
         {
             "data_compra": date(2026, 1, 2),
             "data_vencimento": date(2029, 1, 2),

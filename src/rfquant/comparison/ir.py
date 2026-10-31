@@ -110,8 +110,10 @@ IOF_TABELA: dict[int, float] = {
 def iof(rendimento: float, prazo_dias: int) -> float:
     """Calcula o IOF regressivo para prazos < 30 dias.
 
-    Para prazos >= 30 dias, IOF é zero.
+    Para prazos >= 30 dias ou rendimento <= 0, IOF é zero.
     """
+    if rendimento <= 0:
+        return 0.0
     if prazo_dias < 1:
         return 0.0
     if prazo_dias >= 30:

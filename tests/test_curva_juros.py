@@ -178,7 +178,7 @@ def test_flat_forward_forward_constante_entre_vertices() -> None:
         dt = 0.01
         r_t = e.taxa(t)
         r_tdt = e.taxa(t + dt)
-        return ((1 + r_tdt) ** (t + dt) / (1 + r_t) ** t) ** (1 / dt) - 1
+        return float(((1 + r_tdt) ** (t + dt) / (1 + r_t) ** t) ** (1 / dt) - 1)
 
     # Dentro do segmento 2→5 anos, a forward deve ser constante
     f_25 = forward_1y(2.5)
