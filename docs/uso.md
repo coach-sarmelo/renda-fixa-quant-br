@@ -35,7 +35,7 @@ Variáveis:
 | `RFQ_CACHE_DIR` | Diretório do cache (padrão: `~/.rfquant/cache`) |
 | `BRAPI_TOKEN` | Reservado à fonte `brapi` — **não utilizável hoje** (endpoint de renda fixa exige plano pago; ver [dados.md](dados.md)) |
 
-O `.env.example` lista também `RFQ_DB_PATH` e `RFQ_LOG_LEVEL` — variáveis
+O `.env.example` lista também `RFQ_DB_PATH` e `RFQ_LOG_LEVEL`, variáveis
 reservadas, sem efeito na prática hoje. Para todo o uso documentado aqui,
 nenhuma configuração é necessária.
 
@@ -67,14 +67,14 @@ Opções:
 | `--tipo` | Filtra por tipo: `IPCA+`, `Prefixado`, `Selic` | — |
 | `--limite` | Número máximo de resultados | 50 |
 
-> **Sobre a opção `--fonte`:** o padrão é `auto` — um mapa declarado resolve
+> **Sobre a opção `--fonte`:** o padrão é `auto`. Um mapa declarado resolve
 > cada dado pela sua fonte oficial (títulos → Tesouro Transparente; CDI →
 > série SGS/BCB; fundos → CVM) e a CLI anuncia a fonte usada
 > (`fonte: oficial`). `--fonte=oficial` fixa o Tesouro como fonte (pino de
 > reprodutibilidade, sem token). `--fonte=brapi` hoje **não é utilizável**
-> (exige plano pago e falha sem `BRAPI_TOKEN`) — a resolução automática
+> (exige plano pago e falha sem `BRAPI_TOKEN`). A resolução automática
 > nunca o escolhe. A fonte oficial baixa o CSV público do Tesouro
-> Transparente (sem cadastro), com cache local de 24 h — a primeira
+> Transparente (sem cadastro), com cache local de 24 h: a primeira
 > execução do dia baixa ~14,5 MB; as seguintes leem do cache.
 
 Exemplo de saída (`--fonte=oficial --tipo Prefixado --limite 3`):
@@ -91,11 +91,11 @@ Exemplo de saída (`--fonte=oficial --tipo Prefixado --limite 3`):
 └────────────────────────┴───────────┴────────────┴─────────────┴─────────────┘
 ```
 
-(Valores meramente ilustrativos — a saída real traz as taxas do dia.)
+(Valores meramente ilustrativos; a saída real traz as taxas do dia.)
 
 ### `rfq tesouro precificar`
 
-Precifica um título genérico de renda fixa — matemática pura, sem rede.
+Precifica um título genérico de renda fixa: matemática pura, sem rede.
 A data de referência é sempre a data atual.
 
 ```
@@ -112,15 +112,15 @@ Opções:
 | `--cupom` | Cupom anual em decimal (0 = zero-cupom) | 0.0 |
 | `--vna` | VNA do dia — ativa o modo NTN-B (Tesouro IPCA+): cotação em % do VNA e PU = VNA × cotação/100 (`--cupom 0.06` = NTN-B; sem cupom = NTN-B Principal) | — |
 
-> **Atenção às convenções de unidade — elas diferem entre comandos.**
+> **Atenção às convenções de unidade: elas diferem entre comandos.**
 > `tesouro precificar --taxa` espera **decimal** (`0.062` = 6,2%), enquanto
 > `comparar --cdb/--lci/--tesouro` espera **percentual** (`12.0` = 12%).
 > `rfq comparar --cdb 0.12` e `rfq tesouro precificar --taxa 12` rodam sem
-> erro — e devolvem números errados. Confira a coluna "Descrição" de cada
+> erro e devolvem números errados. Confira a coluna "Descrição" de cada
 > tabela antes de digitar.
 
 > **Título genérico sob o namespace `tesouro`.** O comando precifica
-> qualquer título de renda fixa (incluindo CDB e debênture — daí o nome
+> qualquer título de renda fixa (incluindo CDB e debênture, daí o nome
 > genérico), mas vive sob `tesouro` por ser o caso de uso principal. A data
 > de referência é sempre **a data atual** e não há opção `--data`: para
 > precificar em uma data histórica ou futura, use a biblioteca, que aceita
@@ -158,7 +158,7 @@ composto STN/ANBIMA, calendário real de dias úteis) estão em
 
 Títulos IPCA+ são negociados por cotação em % do VNA: a opção `--vna` ativa
 o modo NTN-B, que acrescenta a linha de cotação ao PU. O VNA do dia não é
-buscado automaticamente — informe-o na opção (o site do Tesouro Direto
+buscado automaticamente. Informe-o na opção (o site do Tesouro Direto
 publica o VNA atualizado de cada título).
 
 NTN-B (com juros semestrais de 6% a.a.):
@@ -179,7 +179,7 @@ Convexidade:    52.0742
 Current Yield:  5.8345%
 ```
 
-NTN-B Principal (sem `--cupom` — e, por isso, sem Current Yield):
+NTN-B Principal (sem `--cupom` e, por isso, sem Current Yield):
 
 ```
 rfq tesouro precificar --vencimento 2035-05-15 --taxa 0.062 --vna 4500.00
@@ -198,7 +198,7 @@ Convexidade:    72.2951
 
 PU = VNA × cotação/100 (no exemplo, 4.560,26 = 4500 × 101,3392/100);
 duration e convexidade saem sobre a base 100 (métricas por unidade de
-preço — a escala do VNA cancela) e o DV01 é a diferença finita de +1 bp no
+preço; a escala do VNA cancela) e o DV01 é a diferença finita de +1 bp no
 PU em reais. `--valor-nominal` não se aplica neste modo: se informado, é
 ignorado com aviso. Fórmulas e evidência de regressão em
 [formulas.md](formulas.md) e [dados.md](dados.md).
@@ -227,7 +227,7 @@ Opções:
 
 Informe ao menos um produto (senão a CLI encerra com erro). O CDB entra em
 uma única unidade (`--cdb` ou `--cdb-cdi`) e o CDI por uma única fonte
-(`--cdi-auto` ou `--cdi`) — uso ambíguo é rejeitado com mensagem explícita.
+(`--cdi-auto` ou `--cdi`). Uso ambíguo é rejeitado com mensagem explícita.
 Saída real do
 comando acima (IR de 17,5% para 720 dias):
 
@@ -249,7 +249,7 @@ Referência normativa: Resolução CVM 20/2021.
 
 A coluna "Equivalente CDB" responde: qual taxa bruta de CDB renderia o
 mesmo líquido? No exemplo, a LCI/LCA isenta a 10,5% equivale a um CDB bruto
-de ~12,73% — melhor que o CDB de 12% oferecido. A convenção de cálculo e
+de ~12,73%, melhor que o CDB de 12% oferecido. A convenção de cálculo e
 sua limitação para prazos ≠ 1 ano estão em [formulas.md](formulas.md#15-convenção-de-taxa-líquida-na-comparação-limitação-declarada).
 
 ### `rfq fundos resumo`
@@ -291,13 +291,13 @@ rfq relatorio gerar --output relatorio.md
 | `--offline` / `--no-offline` | Modo de geração | `offline` |
 
 **Comportamento real de `--no-offline`:** encerra com erro (exit 1).
-Não existe geração de relatório por IA nesta ferramenta — o único caminho é
+Não existe geração de relatório por IA nesta ferramenta. O único caminho é
 o determinístico (`--offline`, o padrão). Se você rodar `--no-offline`,
 receberá uma mensagem explicando isso e nenhum arquivo será gerado.
 
 ### `rfq hoje`
 
-Atalho que mostra um resumo rápido do Tesouro Direto de hoje — os 10
+Atalho que mostra um resumo rápido do Tesouro Direto de hoje: os 10
 primeiros títulos da fonte oficial (sem token), com a mesma tabela do
 `tesouro listar`.
 
@@ -372,7 +372,7 @@ print(e.fator_desconto(3.5))  # (1 + y)^(-prazo)
 ```
 
 E de onde vêm os pontos **reais** da curva de hoje? Do próprio CSV oficial
-que a ferramenta já baixa — `titulos_disponiveis()` devolve os títulos da
+que a ferramenta já baixa: `titulos_disponiveis()` devolve os títulos da
 data-base mais recente, e cada linha vira um ponto `(prazo em anos, taxa)`:
 
 ```python
@@ -432,7 +432,7 @@ hist = provider.historico_taxas(
 ```
 
 > `TesouroOficialProvider` é uma implementação enxuta e direta sobre o CSV
-> oficial — um único download cacheado seguido de parsing/filtro, sem
+> oficial: um único download cacheado seguido de parsing/filtro, sem
 > camadas extras. É a fonte de produção usada por `--fonte=oficial`.
 
 **Regra de formação dos nomes de título** (válida para `historico_taxas`):

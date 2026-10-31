@@ -9,7 +9,7 @@ reais do código (`src/rfquant/pricing/` e `src/rfquant/comparison/`).
 `gerar_fluxos` (`pricing/fluxo_caixa.py`) monta os pagamentos futuros do
 título:
 
-- **Zero-cupom** (`taxa_cupom_anual = 0`): um único fluxo — o valor nominal
+- **Zero-cupom** (`taxa_cupom_anual = 0`): um único fluxo, o valor nominal
   no vencimento.
 - **Com cupom** (`taxa_cupom_anual > 0`): cupons periódicos
   (`frequencia_cupom` por ano, padrão 2 = semestral) de
@@ -17,7 +17,7 @@ título:
 $$\text{cupom} = VN \times \left[(1 + i)^{1/f} - 1\right]$$
 
   mais o principal pago junto ao último cupom. A convenção do cupom é a
-  **composta** do padrão STN/ANBIMA para títulos cupomados — não a linear
+  **composta** do padrão STN/ANBIMA para títulos cupomados, e não a linear
   (`VN × i / f`). Numa NTN-F de 10% a.a. com cupom semestral, o cupom é
   R$ 48,81 (1000 × (1,10^(1/2) − 1) = 48,8088...), e não R$ 50,00.
 
@@ -35,7 +35,7 @@ Onde:
 **Liquidação D+1: cupom na janela sai do preço, resgate fica.** O PU
 publicado pelo Tesouro pressupõe liquidação no próximo dia útil da
 data-base: um CUPOM pago nessa janela pertence ao vendedor e não entra no
-preço do comprador — mas o fluxo final de vencimento permanece embutido
+preço do comprador, mas o fluxo final de vencimento permanece embutido
 mesmo na véspera (`pu.fluxos_liquidados`). Regra medida contra o oficial,
 não assumida: em 27.275 linhas NTN-F do CSV oficial (2004–2026), os 162
 casos em que a regra morde melhoram ~10× com o filtro (p.ex. 6,54e-3 vs
@@ -53,8 +53,8 @@ adaptação documentada de meio período: os pregões de fim de ano
 (24/12 e 31/12 e, quando 31/12 cai num fim de semana, a sexta anterior)
 contam como dias úteis plenos, como no calendário do SFN usado no
 desconto dos títulos públicos. A regra é validada a ±0 (nenhuma
-tolerância) contra 10 casos oficiais — DU publicado e DU derivado dos PUs
-oficiais do Tesouro — registrados em [dados.md](dados.md) e conferidos em
+tolerância) contra 10 casos oficiais (DU publicado e DU derivado dos PUs
+oficiais do Tesouro), registrados em [dados.md](dados.md) e conferidos em
 `tests/test_data_calendario.py`. A antiga aproximação
 dias corridos × 252/365 não é mais usada no núcleo; a medição do erro
 dela permanece em [dados.md](dados.md) como registro histórico.
@@ -72,8 +72,8 @@ desta seção: os fluxos são gerados sobre a **base 100** e descontados pela
 
 $$\text{cotação} = \sum_{t=1}^{n} \frac{FC_t^{(100)}}{(1 + r)^{du_t / 252}}$$
 
-Os cupons da NTN-B são os semestrais compostos da seção 1 — 6% a.a. →
-**2,956301 por semestre por 100 de VNA** — mais o resgate de 100 no
+Os cupons da NTN-B são os semestrais compostos da seção 1 (6% a.a. →
+**2,956301 por semestre por 100 de VNA**), mais o resgate de 100 no
 vencimento, com as datas ancoradas no vencimento (venc 15/08 → cupons 15/02
 e 15/08; venc 15/05 → 15/05 e 15/11). O PU em reais vem do VNA do dia:
 
@@ -83,12 +83,12 @@ A **NTN-B Principal** (sem cupons) é o caso `taxa_cupom_anual = 0`: a
 cotação reduz à fórmula exata da STN, $100 / (1 + r)^{du/252}$.
 
 A liquidação D+1 desta seção é herdada: `ntnb.cotacao` aplica
-`pu.fluxos_liquidados` — o cupom pago na janela do próximo dia útil sai da
+`pu.fluxos_liquidados`. O cupom pago na janela do próximo dia útil sai da
 cotação. A regressão contra o oficial mediu os casos de data-base 15/xx no
 fim de semana: a janela é a do **pagamento útil** (na sexta 13/02/2026, o
-cupom de domingo 15/02 paga na segunda 16/02 — e é ele que sai do preço).
+cupom de domingo 15/02 paga na segunda 16/02, e é ele que sai do preço).
 Nas 4 datas-base de véspera útil de cupom da fixture, o oficial publica o
-PU Compra SEM o cupom da janela e o PU Venda COM ele — visível nos próprios
+PU Compra SEM o cupom da janela e o PU Venda COM ele. É visível nos próprios
 dados (13/02/2026, NTN-B 15/08/2026: PU Compra 4.518,23 < PU Venda 4.646,84
 apesar da taxa de venda MAIOR).
 
@@ -102,13 +102,13 @@ numerador. Nas 16 linhas (12 NTN-B + 4 NTN-B Principal) de 8 datas-base de
 dia em que o viés do PU Venda oficial é maior). A tolerância é 5e-3 (~4,6× o
 pior caso), e não mais apertada, porque o resíduo tem viés multiplicativo de
 +4,2e-4 de mediana consistente com o PU Venda oficial referenciado à
-liquidação — absorvido na tolerância, não corrigido na fórmula. Metodologia,
+liquidação; absorvido na tolerância, não corrigido na fórmula. Metodologia,
 escolha por medição e controles negativos em [dados.md](dados.md).
 
 Implementação: `ntnb.cotacao` (cotação em % do VNA) e `ntnb.calcular`
 (PU = VNA × cotação/100), em `pricing/ntnb.py`. Na CLI, `rfq tesouro
-precificar --vna <VNA_do_dia>` — com `--cupom 0.06` para a NTN-B e sem cupom
-para a NTN-B Principal.
+precificar --vna <VNA_do_dia>` (com `--cupom 0.06` para a NTN-B e sem cupom
+para a NTN-B Principal).
 
 ## 3. Duration de Macaulay
 
@@ -134,7 +134,7 @@ Variação absoluta do PU (em R$) para um choque de +1 ponto-base
 
 $$DV01 = \left|PU(y) - PU(y + 0{,}0001)\right|$$
 
-Calculado por **re-precificação** (diferença finita) — captura a
+Calculado por **re-precificação** (diferença finita). Captura a
 não-linearidade preço × taxa que a aproximação linear ignora. Quando o PU
 e a Duration Modificada já estão calculados, há a aproximação rápida:
 
@@ -152,7 +152,7 @@ em forma fechada na convenção brasileira base 252:
 $$C = \frac{1}{PU \cdot (1+y)^2} \sum_{t=1}^{n} t \cdot (t+1) \cdot \frac{FC_t}{(1+y)^t}$$
 
 onde `t = du_t / 252` (prazo em anos). A convexidade corrige a
-aproximação linear da duration — variação percentual do PU de 2ª ordem:
+aproximação linear da duration, variação percentual do PU de 2ª ordem:
 
 $$\frac{\Delta PU}{PU} \approx -D_{mod} \cdot \Delta y + \frac{1}{2} \cdot C \cdot (\Delta y)^2$$
 
@@ -175,8 +175,8 @@ quando necessário (PUs com ágio ou deságio extremos). Implementação:
 $$CY = \frac{\text{cupom anual (em R\$)}}{PU}$$
 
 O cupom anual é o somatório dos cupons efetivamente pagos no ano, na
-convenção composta da seção 1 — para a frequência padrão (2 semestrais),
-$2 \cdot VN \cdot [(1+i)^{1/2} - 1]$ — e não a divisão linear $VN \cdot i$.
+convenção composta da seção 1, e não a divisão linear $VN \cdot i$. Para
+a frequência padrão (2 semestrais), $2 \cdot VN \cdot [(1+i)^{1/2} - 1]$.
 Rendimento de cupom sobre o preço, sem considerar amortização do principal.
 Implementação: `current_yield.calcular` (o comando `rfq tesouro precificar`
 fornece o cupom anual composto).
@@ -188,15 +188,15 @@ fornece o cupom anual composto).
 $$PU_{mercado} \approx PU_{compra} \cdot [1 - D_{mod} \cdot (y_{mercado} - y_{compra})]$$
 
 Válida para variações pequenas de taxa (< 1 p.p.) e no instante da
-compra — parte de `PU_compra` e ignora o carrego entre a compra e a data
+compra: parte de `PU_compra` e ignora o carrego entre a compra e a data
 atual.
 
 ### Exata (`marktomarket.exata`)
 
 Re-precifica o fluxo remanescente na data de hoje, duas vezes:
 
-- `pu_curva`: fluxo remanescente descontado pela **taxa de compra** — o
-  "carrego" do título, não um resultado de mercado;
+- `pu_curva`: fluxo remanescente descontado pela **taxa de compra** (o
+  "carrego" do título, não um resultado de mercado);
 - `pu_mercado`: o mesmo fluxo descontado pela **taxa de mercado** atual.
 
 A variação é `pu_mercado − pu_curva` (absoluta e percentual), com a
@@ -260,7 +260,7 @@ Disponível nos dois sentidos (`curva_juros.taxa_pre_para_pos` /
 > **Nota de nomenclatura.** Aqui "pré ↔ pós" do `curva_juros` significa
 > prefixado ↔ IPCA+ (taxa real), **não** pós-fixado indexado a CDI/Selic
 > do jargão de mercado. Para o par prefixado ↔ IPCA+ os nomes explícitos
-> são `taxa_equivalente.pre_para_ipca_mais` / `ipca_mais_para_pre` —
+> são `taxa_equivalente.pre_para_ipca_mais` / `ipca_mais_para_pre`,
 > preferidos em código novo. Exemplo de uso está em
 > [uso.md](uso.md#tributação-e-comparação).
 
@@ -285,7 +285,7 @@ cercam o prazo `τ`:
 
 $$(1 + r(\tau))^{\tau} = (1 + r_1)^{t_1} \cdot \left[\frac{(1 + r_2)^{t_2}}{(1 + r_1)^{t_1}}\right]^{\frac{\tau - t_1}{t_2 - t_1}}$$
 
-É o **default** da classe (`metodo="flat_forward"`) — o padrão de
+É o **default** da classe (`metodo="flat_forward"`): o padrão de
 interpolação da curva de juros da B3/ANBIMA, sem oportunidades de
 arbitragem entre vértices. Para prazo fora do intervalo dos nós, usa a
 taxa do nó mais próximo (extrapolação flat).
@@ -316,12 +316,12 @@ $$y_{liq} = y_{bruta} \cdot (1 - \alpha_{prazo})$$
 
 usando a alíquota da tabela regressiva **do prazo informado**. Essa
 convenção é exata para um horizonte de 1 ano. Para prazos diferentes, a
-alíquota aplicada continua sendo a do resgate, o que é uma aproximação —
+alíquota aplicada continua sendo a do resgate, o que é uma aproximação:
 em horizontes curtos a diferença para o cálculo composto pode ser
 perceptível. É uma limitação conhecida e declarada, não um erro de
 implementação.
 
-A variante **composta** — `taxa_equivalente.taxa_liquida_anual_composta` —
+A variante **composta** (`taxa_equivalente.taxa_liquida_anual_composta`)
 é exata para horizontes `t ≠ 1` ano: o IR incide uma única vez, no
 resgate, sobre o ganho acumulado:
 

@@ -8,12 +8,12 @@ fonte em produção, por que ela foi escolhida e suas limitações medidas.
 - **Dataset:** `taxas-dos-titulos-ofertados-pelo-tesouro-direto`
 - **URL do recurso (CSV):** https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv
 - **Descoberta via API CKAN:** `https://www.tesourotransparente.gov.br/ckan/api/3/action/package_show?id=taxas-dos-titulos-ofertados-pelo-tesouro-direto` (JSON, público)
-- **Formato:** CSV `;` com decimais pt-BR (vírgula) e datas `DD/MM/AAAA` — colunas:
+- **Formato:** CSV `;` com decimais pt-BR (vírgula) e datas `DD/MM/AAAA`. Colunas:
   `Tipo Titulo; Data Vencimento; Data Base; Taxa Compra Manha; Taxa Venda Manha; PU Compra Manha; PU Venda Manha; PU Base Manha`
 - **Conteúdo:** histórico completo de taxas/PU (compra e venda, manhã) por `Data Base` diária desde 31/12/2004; ~14,5 MB / ~176k linhas (medido 2026-09-19)
 - **Auth:** nenhuma · **Licença:** ODbL (Open Data Commons) · **Cadência:** diária (~10h)
-- **Taxas em % a.a.** (ex.: `14,10` = 14,10% a.a. para Prefixado; `0,07` = 0,07% para Selic) — o parser confere a escala e converte para fração decimal
-- **Cache local:** o provider (`TesouroOficialProvider`) reusa `rfquant.data.cache` (diskcache — SQLite por baixo), TTL de 24 h: o arquivo de 14,5 MB é baixado no máximo 1×/dia e o parsing filtra a `Data Base` de interesse
+- **Taxas em % a.a.** (ex.: `14,10` = 14,10% a.a. para Prefixado; `0,07` = 0,07% para Selic). O parser confere a escala e converte para fração decimal
+- **Cache local:** o provider (`TesouroOficialProvider`) reusa `rfquant.data.cache` (diskcache, SQLite por baixo), TTL de 24 h: o arquivo de 14,5 MB é baixado no máximo 1×/dia e o parsing filtra a `Data Base` de interesse
 
 ### Por que o CSV oficial (avaliação das alternativas, verificada com curl em 2026-09-19)
 
@@ -27,8 +27,8 @@ fonte em produção, por que ela foi escolhida e suas limitações medidas.
 | brapi v2 `/api/v2/treasury` | HTTP 401 sem `BRAPI_TOKEN`; **HTTP 403 `FEATURE_NOT_AVAILABLE` com token válido de conta Gratuita** (verificado 2026-09-20) | ✗ para fonte sem token e ✗ com plano Gratuito (ver seção brapi abaixo) |
 
 Em resumo: o CSV oficial do Tesouro Transparente é o único candidato que
-satisfaz os três requisitos — público, sem cadastro/token e com os títulos
-de que a ferramenta precisa — sem depender de anti-bot ou paywall.
+satisfaz os três requisitos (público, sem cadastro/token e com os títulos
+de que a ferramenta precisa), sem depender de anti-bot ou paywall.
 
 ### Uso na CLI
 
@@ -38,12 +38,12 @@ rfq tesouro listar --fonte=oficial --tipo IPCA+    # filtro por tipo
 rfq hoje                                           # resumo do dia
 ```
 
-> **Atenção:** o valor padrão de `--fonte` é `auto` — mapa declarado em
-> `rfquant.data.fontes`: títulos pela fonte oficial do Tesouro, CDI pela
+> **Atenção:** o valor padrão de `--fonte` é `auto`. O mapa declarado em
+> `rfquant.data.fontes` define: títulos pela fonte oficial do Tesouro, CDI pela
 > série 12 do SGS/BCB e fundos pelo informe diário da CVM, com a fonte
 > usada anunciada na saída. O pino `--fonte=brapi` existe para
 > reprodutibilidade e exige `BRAPI_TOKEN`: sem o token a CLI falha com
-> mensagem explícita (exit 1) — não há substituição silenciosa de fonte.
+> mensagem explícita (exit 1); não há substituição silenciosa de fonte.
 
 ### Fixture de regressão com valores oficiais
 
@@ -58,7 +58,7 @@ completo (176.390 linhas, 28.125 de LTN, todas as datas-base desde
 31/12/2004) comparando `pu.calcular(data_base, venc, taxa_compra/100)` com
 o `PU Compra Manha` oficial. A data-base 15/07/2024 é a **mais recente**
 em que ≥ 3 LTNs ficam dentro da tolerância de regressão (erro relativo
-≤ 1e-3) — depois dela, nenhuma data-base tem ≥ 3 LTNs na tolerância
+≤ 1e-3). Depois dela, nenhuma data-base tem ≥ 3 LTNs na tolerância
 (máximo 2).
 
 Títulos da data-base 15/07/2024 (erro = |`pu.calcular` − PU oficial| / PU oficial):
@@ -75,28 +75,28 @@ Exemplo de derivação à mão (01/01/2025): dc = 170 dias corridos; a
 aproximação (dias corridos × 252/365) dá
 du = round(170 × 252/365) = 117; PU = 1000/(1,105)^(117/252) = 954,70.
 O PU oficial de 954,32 implica du oficial = 252·ln(1000/954,32)/ln(1,105) =
-118,01 → **118 dias úteis reais** — 1 DU de diferença explica o erro.
+118,01 → **118 dias úteis reais**. 1 DU de diferença explica o erro.
 
 ### Fixture de regressão da NTN-B (razão de PUs)
 
 `tests/fixtures/tesouro_regressao_ntnb.csv` é um excerto byte a byte do
 mesmo CSV oficial CKAN (path acima), capturado em 2026-10-06 (arquivo
-inteiro: 177.028 linhas desde 31/12/2004 — 44.064 da NTN-B, 'Tesouro IPCA+
+inteiro: 177.028 linhas desde 31/12/2004; 44.064 da NTN-B, 'Tesouro IPCA+
 com Juros Semestrais', e 18.900 da NTN-B Principal, 'Tesouro IPCA+'). São
 **16 linhas em 8 datas-base de 2024 a 2026** (15/02/2024, 14/08/2024,
 10/03/2025, 14/08/2025, 13/02/2026, 14/05/2026, 30/06/2026 e 05/10/2026),
-uma dupla por data-base — 12 NTN-B + 4 Principal — com prazos de 46 dias
+uma dupla por data-base (12 NTN-B + 4 Principal), com prazos de 46 dias
 corridos (NTN-B 15/08/2026 na base 30/06/2026) a 12.942 (NTN-B 15/08/2060
 na base 10/03/2025) e 4 datas-base de véspera útil de cupom (14/08/2024,
-14/08/2025, 14/05/2026 e 13/02/2026 — cupom de domingo 15/02, pagamento na
+14/08/2025, 14/05/2026 e 13/02/2026; cupom de domingo 15/02, pagamento na
 segunda 16/02).
 
 **Por que a razão de PUs, e não o PU absoluto: o CSV não publica o VNA.** A
 coluna 'PU Base Manha' é **igual a 'PU Venda Manha'** em 10.128/10.128
-linhas IPCA+ do escopo 2024–2026 (16/16 da fixture) — é o PU do lado da
+linhas IPCA+ do escopo 2024–2026 (16/16 da fixture): é o PU do lado da
 venda, não um valor nominal atualizado. Usá-la como VNA NÃO replica o PU
 oficial: erro medido de 8,882e-3 a 8,156e-1 nas 16 linhas (mediana 1,148e-1;
-0 de 691 datas-base a ≤ 1e-3 no escopo) — controle negativo do teste. O que
+0 de 691 datas-base a ≤ 1e-3 no escopo); controle negativo do teste. O que
 a fixture permite calibrar com verdade externa é a razão entre os dois lados
 do spread:
 
@@ -112,7 +112,7 @@ do escopo 2024–2026 (6.237 linhas de NTN-B em 691 datas-base + 3.891 da
 Principal). Nas 10.078 linhas sem cupom na janela D+1, a razão fecha com
 mediana 4,165e-4, p95 8,343e-4 e máximo 2,595e-3 (98,1% ≤ 1e-3; 96,5% das
 datas-base); nas 50 linhas D+1 (11 datas-base: 14/02, 14/05, 14/08 e 14/11
-de 2024 e 2025, 13/02, 14/05 e 14/08 de 2026 — quando o cupom 15/xx cai no
+de 2024 e 2025, 13/02, 14/05 e 14/08 de 2026; quando o cupom 15/xx cai no
 fim de semana, a janela é a do pagamento útil), mediana 4,132e-4 e máximo
 1,302e-3. Erros medidos na fixture (B = NTN-B, Pr = NTN-B Principal):
 
@@ -127,19 +127,19 @@ fim de semana, a janela é a do pagamento útil), mediana 4,132e-4 e máximo
 | 30/06/2026 | B 15/08/2026 (46 d) · B 15/08/2060 | 5,384e-4 · 3,999e-4 |
 | 05/10/2026 | B 15/08/2030 · Pr 15/05/2035 | 5,094e-4 · 5,040e-4 |
 
-**Tolerância 5e-3** — ~4,6× o pior caso medido (1,082e-3) —, e não 1e-4 nem
+**Tolerância 5e-3** (~4,6× o pior caso medido, 1,082e-3), e não 1e-4 nem
 1e-3, porque o resíduo do escopo tem viés multiplicativo de +4,18e-4 de
 mediana (99,7% das linhas positivas; +6,25e-4 nas sextas) consistente com o
-PU Venda oficial referenciado à data de liquidação — descontar o lado da
+PU Venda oficial referenciado à data de liquidação: descontar o lado da
 venda no próximo dia útil reduziria o viés a +1,35e-4. O viés é do oficial,
 não do núcleo: absorvido na tolerância, não corrigido na fórmula.
 
 **Controles negativos medidos** (o que a razão de fato discrimina): (i) o PU
-Base como VNA — 8,882e-3 a 8,156e-1, as 16/16 linhas fora; (ii) nas 4
+Base como VNA: 8,882e-3 a 8,156e-1, as 16/16 linhas fora; (ii) nas 4
 vésperas de cupom, o filtro D+1 nos DOIS lados (2,902e-2 a 3,275e-2) ou em
 NENHUM (2,887e-2 a 3,245e-2), ambos ~6–7× a tolerância. O cupom LINEAR
 (3,0 por semestre por 100 de VNA), que discrimina o PU absoluto da NTN-F,
-NÃO discrimina a razão — medido 3,467e-4 a 1,501e-3, dentro de 5e-3: um
+NÃO discrimina a razão (medido 3,467e-4 a 1,501e-3, dentro de 5e-3): um
 shift multiplicativo no cupom sobe numerador e denominador juntos.
 
 A fixture só é regravada quando a fórmula de cotação/PU da NTN-B mudar
@@ -152,15 +152,15 @@ A fixture só é regravada quando a fórmula de cotação/PU da NTN-B mudar
 > calendário real** B3/SFN (`rfquant.data.calendario`, feriados do
 > `pandas-market-calendars` com adaptação documentada de meio período de
 > fim de ano), validado a ±0 contra os dias úteis oficiais registrados
-> nesta página e na bateria de calendário dos testes — ver
-> [formulas.md](formulas.md). O trabalho de medição permanece preservado
+> nesta página e na bateria de calendário dos testes (ver
+> [formulas.md](formulas.md)). O trabalho de medição permanece preservado
 > abaixo como o registro que motivou a mudança; não descreve o
 > comportamento atual.
 
 O núcleo (`pu.calcular`, `src/rfquant/pricing/pu.py`) estimava dias úteis
 por dias corridos × 252/365; o PU oficial do Tesouro desconta pelos dias
 úteis **reais** do calendário brasileiro (com feriados). O erro relativo
-do PU resultante **crescia com o prazo** — medido na data-base 30/06/2026
+do PU resultante **crescia com o prazo**; medido na data-base 30/06/2026
 (só 1 dos 5 LTNs ficava dentro de 1e-3):
 
 | Vencimento | Taxa compra | PU oficial | `pu.calcular` (aprox. 252/365) | Erro rel. | du aprox. | du oficial* |
@@ -172,13 +172,13 @@ do PU resultante **crescia com o prazo** — medido na data-base 30/06/2026
 | 01/01/2032 | 14,42% | 478,48 | 476,1842 | 4,80e-3 | 1388 | 1379 |
 
 \* du oficial = expoente implícito ao inverter o PU oficial
-(du = 252·ln(1000/PU)/ln(1+y)) — chega a 9 DU de desvio no prazo de 5,5 anos.
+(du = 252·ln(1000/PU)/ln(1+y)). Chega a 9 DU de desvio no prazo de 5,5 anos.
 
 Foi esse crescimento que motivou fixar a data-base da fixture de regressão
 de LTN em 15/07/2024 (a última com ≥ 3 LTNs de prazo curto suficiente) e
 que motivou o calendário real, hoje implementado. Com o calendário real e o
 cupom composto STN/ANBIMA, os erros medidos caem para ≤ 1,7e-5 (os 5 LTNs)
-e ≤ 9,39e-5 (NTN-F, pior caso = liquidação D+1) — as tolerâncias dos testes
+e ≤ 9,39e-5 (NTN-F, pior caso = liquidação D+1). As tolerâncias dos testes
 de regressão foram apertadas ao erro medido: 1e-4 (LTN) e 5e-4 (NTN-F),
 margem de ~5–6×. A fixture só é regravada quando a fórmula de PU muda
 (mesmo padrão de cabeçalho de auditoria). A regressão NTN-F (9 datas-base
@@ -189,11 +189,11 @@ tolerância de 5e-4.
 
 - **URL do endpoint de treasury:** https://brapi.dev/api/v2/treasury
 - **Auth:** `BRAPI_TOKEN` obrigatório (401 sem token)
-- **Paywall (verificado 2026-09-20, curl com token válido):** o endpoint de treasury/renda fixa é feature do **plano Pro (R$ 139,99/mês)** — com token autenticado de conta **Gratuita** a API responde `HTTP 403` com `{"error":true,"code":"FEATURE_NOT_AVAILABLE","details":{"feature":"canAccessFixedIncome","currentPlan":"free","requiredPlan":"pro"}}` (o fato de a resposta nomear o plano da conta prova que o token foi aceito).
+- **Paywall (verificado 2026-09-20, curl com token válido):** o endpoint de treasury/renda fixa é feature do **plano Pro (R$ 139,99/mês)**: com token autenticado de conta **Gratuita** a API responde `HTTP 403` com `{"error":true,"code":"FEATURE_NOT_AVAILABLE","details":{"feature":"canAccessFixedIncome","currentPlan":"free","requiredPlan":"pro"}}` (o fato de a resposta nomear o plano da conta prova que o token foi aceito).
 
 Por isso a fonte documentada é a oficial (`--fonte=oficial`), que não
 requer token nem assinatura. A integração brapi permanece registrada apenas
-como **plano futuro** — se um dia for ativada, exigirá plano pago e será
+como **plano futuro**. Se um dia for ativada, exigirá plano pago e será
 documentada aqui.
 
 ## Fundos de Investimento (CVM)
@@ -204,7 +204,7 @@ documentada aqui.
 - **Formato:** ZIP → CSV (`;`, latin-1) no layout vigente de classes/subclasses da RCVM 175
 - **Cobertura:** informes diários de fundos (cota, patrimônio líquido, captações, resgates, cotistas)
 - **Janela:** últimos 12 meses + históricos anteriores
-- **Cadência:** diária (D+1) — o ZIP mensal é atualizado a cada dia útil intramês e congela no fechamento do mês
+- **Cadência:** diária (D+1). O ZIP mensal é atualizado a cada dia útil intramês e congela no fechamento do mês
 - **Autenticação:** nenhuma
 
 ### Uso na CLI
@@ -213,15 +213,15 @@ documentada aqui.
 rfq fundos resumo --cnpj 00.000.000/0000-00 --mes 2026-08
 ```
 
-Resume a rentabilidade do fundo no mês em três números — acumulada do
+Resume a rentabilidade do fundo no mês em três números: acumulada do
 período, anualizada (base 252, dias úteis do calendário real) e expressa
-em % do CDI da mesma janela — direto do informe oficial da CVM, sem
+em % do CDI da mesma janela, direto do informe oficial da CVM, sem
 token. O download do ZIP do mês (~11 MB) cai no cache em disco com TTL
 de 24 h.
 
 ## Indicadores macro (BCB SGS) — referência externa
 
-- **BCB (SGS):** [https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados](https://api.bcb.gov.br/dados/serie/bcdata.sgs.%7Bcodigo%7D/dados) — séries como Selic meta (432), CDI e IPCA, JSON sem autenticação.
+- **BCB (SGS):** [https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados](https://api.bcb.gov.br/dados/serie/bcdata.sgs.%7Bcodigo%7D/dados). Séries como Selic meta (432), CDI e IPCA, JSON sem autenticação.
 
 O `rfquant` já consome o CDI (série 12 do SGS, % ao dia) nos comandos
 `comparar --cdi-auto` e `fundos resumo`; as demais séries (Selic meta,
@@ -240,8 +240,8 @@ IPCA) seguem apenas como referência externa, no radar de integração (ver
 
 ## Próximos passos
 
-- [x] Calendário brasileiro real de feriados para dias úteis exatos — feito: o núcleo usa `rfquant.data.calendario` (a medição da antiga aproximação 252/365 permanece como registro histórico)
+- [x] Calendário brasileiro real de feriados para dias úteis exatos. Feito: o núcleo usa `rfquant.data.calendario` (a medição da antiga aproximação 252/365 permanece como registro histórico)
 - [ ] Demais séries macro (Selic meta, IPCA) via SGS/BCB como providers
-- [ ] Scraper do portal do Tesouro Direto como **fonte contingencial — planejada, não implementada** (só seria acionada se o CSV oficial deixasse de funcionar)
+- [ ] Scraper do portal do Tesouro Direto como **fonte contingencial (planejada, não implementada)** (só seria acionada se o CSV oficial deixasse de funcionar)
 - [ ] Integração com ANBIMA para debêntures
 - [ ] Adapter para OpenBB (`openbb-br` provider)
