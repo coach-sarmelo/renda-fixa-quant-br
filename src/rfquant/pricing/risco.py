@@ -7,24 +7,13 @@ Convenções:
     - Base 252 dias úteis (padrão ANBIMA/B3)
     - Capitalização composta anual
     - DV01 em R$ por 1 bp (0,01%)
-
-Nota sobre o import de `_pu_de_fluxos`: é privado de pu.py e o seu uso aqui
-segue o padrão dos módulos irmãos — src/rfquant/pricing/ytm.py e
-src/rfquant/pricing/duration.py já importam o mesmo privado de pu.py para
-reusar o núcleo de desconto sem expor uma segunda API pública.
 """
 
 from __future__ import annotations
 
 from datetime import date
 
-from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import (
-    DU_ANO,
-    _pu_de_fluxos,
-    dias_uteis,
-    fluxos_liquidados,
-)
+from rfquant.pricing.pu import precificar
 
 
 def dv01(
@@ -46,17 +35,14 @@ def dv01(
     Returns:
         DV01 em R$ (sempre positivo).
     """
-    fluxos = gerar_fluxos(
-        data_compra=data_compra,
+    return precificar(
+        data_base=data_compra,
         data_vencimento=data_vencimento,
+        taxa_anual=taxa_anual,
         valor_nominal=valor_nominal,
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
-    )
-    fluxos = fluxos_liquidados(fluxos, data_compra)
-    pu_base = _pu_de_fluxos(fluxos, data_compra, taxa_anual)
-    pu_chocado = _pu_de_fluxos(fluxos, data_compra, taxa_anual + 0.0001)
-    return abs(pu_base - pu_chocado)
+    ).dv01
 
 
 def dv01_rapido(pu_valor: float, duration_mod: float) -> float:
@@ -94,26 +80,14 @@ def convexidade(
         Convexidade em anos² (o `t` da fórmula é medido em anos; a
         normalização pelo PU não torna o resultado adimensional).
     """
-    fluxos = gerar_fluxos(
-        data_compra=data_compra,
+    return precificar(
+        data_base=data_compra,
         data_vencimento=data_vencimento,
+        taxa_anual=taxa_anual,
         valor_nominal=valor_nominal,
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
-    )
-    fluxos = fluxos_liquidados(fluxos, data_compra)
-    pu_valor = _pu_de_fluxos(fluxos, data_compra, taxa_anual)
-    if pu_valor <= 0:
-        raise ValueError("PU inválido para cálculo de convexidade.")
-
-    soma = 0.0
-    for f in fluxos:
-        du = dias_uteis(data_compra, f.data)
-        t = du / DU_ANO
-        vp = f.valor / (1 + taxa_anual) ** t
-        soma += t * (t + 1) * vp
-
-    return soma / (pu_valor * (1 + taxa_anual) ** 2)
+    ).convexidade
 
 
 def variacao_pu(

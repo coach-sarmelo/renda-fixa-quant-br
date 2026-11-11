@@ -29,6 +29,7 @@ import requests
 
 from rfquant.data import cache
 from rfquant.data.base import DataProvider, Titulo
+from rfquant.data.cache import USER_AGENT
 
 URL_CSV = (
     "https://www.tesourotransparente.gov.br/ckan/dataset/"
@@ -36,9 +37,6 @@ URL_CSV = (
     "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
 )
 TTL_CSV = 86_400  # 24 h: o arquivo troca 1×/dia (~10h)
-USER_AGENT = (
-    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
-)
 
 
 class TesouroOficialProvider(DataProvider):
@@ -96,13 +94,7 @@ class TesouroOficialProvider(DataProvider):
     # Internos
     # ------------------------------------------------------------------
     def _ler_csv(self) -> pd.DataFrame:
-        # Frame parseado é cacheado ALÉM do texto cru: em cache hit o
-        # read_csv do arquivo integral (~14,5 MB) não roda de novo. Mesma
-        # TTL do CSV — texto e frame expiram juntos.
-        chave_frame = f"{self.url}::df"
-        df_cache: pd.DataFrame | None = None
-        df_cache = cache.frame_do_cache(cache.get(chave_frame))
-        if df_cache is None:
+        def _construir() -> pd.DataFrame:
             texto: str | None = cache.get(self.url)
             if texto is None:
                 resp = requests.get(
@@ -113,12 +105,9 @@ class TesouroOficialProvider(DataProvider):
                 resp.raise_for_status()
                 texto = resp.text
                 cache.set(self.url, texto, ttl=self.ttl)
-            df_cache = self._parsear(texto)
-            # Payload portável (dict de arrays numpy) em vez do frame
-            # picklado: pickle de frame do pandas 3 referencia o pyarrow e
-            # não desserializa em ambiente sem o pacote.
-            cache.set(chave_frame, cache.frame_para_cache(df_cache), ttl=self.ttl)
-        return df_cache
+            return self._parsear(texto)
+
+        return cache.obter_ou_parsear_frame(self.url, ttl=self.ttl, construtor=_construir)
 
     @staticmethod
     def _parsear(texto: str) -> pd.DataFrame:

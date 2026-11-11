@@ -2,7 +2,8 @@
 
 O Tesouro IPCA+ é negociado por uma cotação em % do VNA (Valor Nominal
 Atualizado pelo IPCA); o PU pago na liquidação é reconstruído a partir do
-VNA do dia. Este módulo separa as duas camadas:
+VNA do dia. Este módulo expõe os delegadores de conveniência sobre o
+núcleo unificado de avaliação (`rfquant.pricing.precificar`):
 
     - ``cotacao``: preço teórico em % do VNA — fluxos gerados sobre a
       base 100 (cupom composto STN: 6% a.a. → 2,956301 por semestre por
@@ -11,21 +12,14 @@ VNA do dia. Este módulo separa as duas camadas:
 
 A NTN-B Principal (sem cupons) é o caso ``taxa_cupom_anual=0``: a cotação
 reduz à fórmula exata da STN, ``100 / (1 + r)^(du/252)``.
-
-Reuso do núcleo: fluxos de ``fluxo_caixa.gerar_fluxos``, liquidação D+1 de
-``pu.fluxos_liquidados`` e desconto de ``pu._pu_de_fluxos`` — o mesmo
-privado que duration.py/risco.py/ytm.py já importam para não expor uma
-segunda API pública de desconto.
 """
 
 from __future__ import annotations
 
 from datetime import date
 
-from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import _pu_de_fluxos, fluxos_liquidados
+from rfquant.pricing.pu import precificar
 
-# Fluxos sobre 100 de VNA: o PU dessa base JÁ é a cotação em % do VNA.
 _BASE_COTACAO = 100.0
 
 
@@ -62,14 +56,14 @@ def cotacao(
             real é <= -100% ou se cupom/frequência são inválidos —
             validações do núcleo reutilizado.
     """
-    fluxos = gerar_fluxos(
-        data_compra=data_compra,
+    return precificar(
+        data_base=data_compra,
         data_vencimento=data_vencimento,
+        taxa_anual=taxa_real,
         valor_nominal=_BASE_COTACAO,
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
-    )
-    return _pu_de_fluxos(fluxos_liquidados(fluxos, data_compra), data_compra, taxa_real)
+    ).pu
 
 
 def calcular(
@@ -95,18 +89,13 @@ def calcular(
 
     Raises:
         ValueError: Se ``vna <= 0``; as demais validações (datas, taxa,
-            cupom, frequência) vêm do núcleo reutilizado por ``cotacao``.
+            cupom, frequência) vêm do núcleo reutilizado.
     """
-    if vna <= 0:
-        raise ValueError("VNA deve ser positivo.")
-    return (
-        vna
-        * cotacao(
-            data_compra=data_compra,
-            data_vencimento=data_vencimento,
-            taxa_real=taxa_real,
-            taxa_cupom_anual=taxa_cupom_anual,
-            frequencia_cupom=frequencia_cupom,
-        )
-        / _BASE_COTACAO
-    )
+    return precificar(
+        data_base=data_compra,
+        data_vencimento=data_vencimento,
+        taxa_anual=taxa_real,
+        taxa_cupom_anual=taxa_cupom_anual,
+        frequencia_cupom=frequencia_cupom,
+        vna=vna,
+    ).pu

@@ -31,16 +31,29 @@ CATEGORIAS: tuple[str, ...] = (
     "debênture-incentivada",
     "fundo",
 )
+CATEGORIAS_ISENTAS: tuple[str, ...] = ("LCI", "LCA", "debênture-incentivada")
+
+
+def validar_categoria(categoria: str | None) -> str | None:
+    """Categoria fora da lista fechada ⇒ ValueError em pt-BR."""
+    if categoria is not None and categoria not in CATEGORIAS:
+        raise ValueError(
+            f"Categoria desconhecida: {categoria!r}. Use uma de: {', '.join(CATEGORIAS)}."
+        )
+    return categoria
+
+
+def isento_por_categoria(categoria: str | None) -> bool:
+    """Deriva isenção de IR exclusivamente pela categoria do produto."""
+    return categoria in CATEGORIAS_ISENTAS
 
 
 class Titulo(BaseModel):
     """Representação normalizada de um título de renda fixa.
 
-    Modelo canônico de produto: ProdutoRF
-    (comparison/taxa_equivalente.py) e a dataclass do núcleo de ranking
-    (fora do pacote público) são views derivadas, convertidas
-    exclusivamente via de_titulo(). O prazo de análise não vive aqui — é
-    da análise, não do produto.
+    Modelo canônico de produto: `ProdutoRF` (`comparison/taxa_equivalente.py`)
+    é a view de comparação, convertida via `de_titulo()` ou diretamente com
+    `categoria`. O prazo de análise não vive aqui — é da análise, não do produto.
     """
 
     nome: str = Field(..., description="Ex: 'Tesouro IPCA+ 2035'")
@@ -62,10 +75,7 @@ class Titulo(BaseModel):
     @field_validator("categoria")
     @classmethod
     def _validar_categoria(cls, v: str | None) -> str | None:
-        """Categoria fora da lista fechada ⇒ ValueError em pt-BR."""
-        if v is not None and v not in CATEGORIAS:
-            raise ValueError(f"Categoria desconhecida: {v!r}. Use uma de: {', '.join(CATEGORIAS)}.")
-        return v
+        return validar_categoria(v)
 
     @model_validator(mode="after")
     def _derivar_isento_ir_do_modelo(self) -> Titulo:
@@ -84,7 +94,7 @@ def derivar_isento_ir(tipo: TipoTitulo, categoria: str | None) -> bool:
     """
     if tipo == "LCI/LCA":
         return True
-    return tipo == "Debênture" and categoria == "debênture-incentivada"
+    return tipo == "Debênture" and isento_por_categoria(categoria)
 
 
 class DataProvider(ABC):

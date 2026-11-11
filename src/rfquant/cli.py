@@ -14,7 +14,6 @@ from __future__ import annotations
 import re
 import zipfile
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -26,18 +25,11 @@ from rich.table import Table
 from rfquant import __version__
 from rfquant.comparison import ir, taxa_equivalente
 from rfquant.config import settings
-from rfquant.data import TesouroDiretoProvider, TesouroOficialProvider, Titulo
+from rfquant.data import TesouroDiretoProvider, TesouroOficialProvider
 from rfquant.data.base import DataProvider
-from rfquant.data.cvm_fundos import (
-    InformeNaoDisponivel,
-    RedeIndisponivel,
-    percentual_cdi,
-    rentabilidade_anualizada,
-    rentabilidade_periodo,
-)
+from rfquant.data.cvm_fundos import InformeNaoDisponivel, RedeIndisponivel
 from rfquant.data.fontes import provider_do_dado, rotulo_do_provider
-from rfquant.pricing import current_yield, duration, ntnb, pu, risco
-from rfquant.pricing.fluxo_caixa import cupom_periodo
+from rfquant.pricing import precificar
 
 app = typer.Typer(
     name="rfq",
@@ -164,38 +156,6 @@ def tesouro_listar(
     console.print(tabela)
 
 
-def _precificar_ipca(hoje: date, venc: date, taxa: float, cupom: float, vna: float) -> None:
-    """Saída do modo IPCA+ (`--vna`): NTN-B precificada pela taxa real.
-
-    PU = VNA × cotação/100 (ntnb.calcular); cotação em % do VNA
-    (ntnb.cotacao). Duration e convexidade são calculadas sobre a base
-    100 — métricas por unidade de preço, em que a escala do VNA cancela.
-    O DV01 vem por diferença finita no PU real (re-precificação com
-    +1 bp, mesma filosofia de risco.dv01).
-    """
-    p = ntnb.calcular(hoje, venc, taxa, vna, taxa_cupom_anual=cupom)
-    cot = ntnb.cotacao(hoje, venc, taxa, taxa_cupom_anual=cupom)
-    d_mac = duration.macaulay(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
-    d_mod = duration.modificada(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
-    cvx = risco.convexidade(hoje, venc, taxa, valor_nominal=100.0, taxa_cupom_anual=cupom)
-    d_v01 = abs(p - ntnb.calcular(hoje, venc, taxa + 0.0001, vna, taxa_cupom_anual=cupom))
-
-    console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
-    console.print(f"[bold]Cotação:[/]        {cot:.4f} % do VNA")
-    console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
-    console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
-    console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
-    console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
-
-    if cupom > 0:
-        # Cupom anual em R$ sobre o VNA informado: 2 cupons semestrais
-        # (compostos STN — o mesmo valor que gerar_fluxos paga) por 100 de
-        # VNA, escalados ao VNA real.
-        cupom_anual = vna * 2 * cupom_periodo(100.0, cupom, 2) / 100.0
-        cy = current_yield.calcular(cupom_anual, p)
-        console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
-
-
 @tesouro_app.command("precificar")
 def tesouro_precificar(
     vencimento: Annotated[str, typer.Option(help="Data de vencimento (YYYY-MM-DD)")],
@@ -238,43 +198,30 @@ def tesouro_precificar(
         )
 
     try:
-        # Modo IPCA+ (NTN-B): a base do título é o VNA, não um valor de face
-        # digitado — --valor-nominal não se aplica e é ignorado com aviso.
-        if vna is not None:
-            if valor_nominal != 1000.0:
-                console.print(
-                    "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
-                    "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
-                )
-            _precificar_ipca(hoje, venc, taxa, cupom, vna)
-            return
+        if vna is not None and valor_nominal != 1000.0:
+            console.print(
+                "[yellow]Aviso:[/] --valor-nominal é ignorado no modo --vna "
+                "(IPCA+): o PU vem do VNA informado. Prosseguindo com o VNA."
+            )
 
-        p = pu.calcular(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-        d_mac = duration.macaulay(
-            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
-        )
-        d_mod = duration.modificada(
-            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
+        avaliacao = precificar(
+            data_base=hoje,
+            data_vencimento=venc,
+            taxa_anual=taxa,
+            valor_nominal=valor_nominal,
+            taxa_cupom_anual=cupom,
+            vna=vna,
         )
 
-        d_v01 = risco.dv01(hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom)
-        cvx = risco.convexidade(
-            hoje, venc, taxa, valor_nominal=valor_nominal, taxa_cupom_anual=cupom
-        )
-
-        console.print(f"[bold]PU:[/]              R$ {p:,.2f}")
-        console.print(f"[bold]Duration Mac:[/]   {d_mac:.4f} anos")
-        console.print(f"[bold]Duration Mod:[/]   {d_mod:.4f}")
-        console.print(f"[bold]DV01:[/]           R$ {d_v01:.4f} / bp")
-        console.print(f"[bold]Convexidade:[/]    {cvx:.4f}")
-
+        console.print(f"[bold]PU:[/]              R$ {avaliacao.pu:,.2f}")
+        if avaliacao.cotacao is not None:
+            console.print(f"[bold]Cotação:[/]        {avaliacao.cotacao:.4f} % do VNA")
+        console.print(f"[bold]Duration Mac:[/]   {avaliacao.duration_macaulay:.4f} anos")
+        console.print(f"[bold]Duration Mod:[/]   {avaliacao.duration_modificada:.4f}")
+        console.print(f"[bold]DV01:[/]           R$ {avaliacao.dv01:.4f} / bp")
+        console.print(f"[bold]Convexidade:[/]    {avaliacao.convexidade:.4f}")
         if cupom > 0:
-            # Cupom anual efetivo na convenção composta STN/ANBIMA (2 cupons por
-            # ano, a frequência padrão do núcleo de precificação): o mesmo cupom
-            # que gerar_fluxos paga — e não a divisão linear cupom × nominal.
-            cupom_anual = 2 * cupom_periodo(valor_nominal, cupom, 2)
-            cy = current_yield.calcular(cupom_anual, p)
-            console.print(f"[bold]Current Yield:[/]  {cy:.4%}")
+            console.print(f"[bold]Current Yield:[/]  {avaliacao.current_yield:.4%}")
     except ValueError as erro:
         console.print(f"[red]Erro ao precificar:[/] {erro}")
         raise typer.Exit(code=1) from None
@@ -388,28 +335,24 @@ def comparar(
         console.print(f"CDI ({fonte_cdi}): {cdi_valor:.2%}")
 
     if cdb is not None:
-        produtos.append(taxa_equivalente.ProdutoRF("CDB", cdb / 100, prazo, isento=False))
+        produtos.append(taxa_equivalente.ProdutoRF("CDB", cdb / 100, prazo, categoria="CDB"))
     if cdb_cdi is not None:
         # A conversão '% do CDI' → % a.a. é contrato do núcleo de comparação.
         taxa_cdb_cdi = taxa_equivalente.cdi_para_taxa_anual(cdb_cdi / 100, cdi_valor)
-        produtos.append(taxa_equivalente.ProdutoRF("CDB", taxa_cdb_cdi, prazo, isento=False))
+        produtos.append(taxa_equivalente.ProdutoRF("CDB", taxa_cdb_cdi, prazo, categoria="CDB"))
     if lci is not None:
-        produtos.append(taxa_equivalente.ProdutoRF("LCI/LCA", lci / 100, prazo, isento=True))
+        produtos.append(taxa_equivalente.ProdutoRF("LCI/LCA", lci / 100, prazo, categoria="LCI"))
     if tesouro is not None:
         produtos.append(taxa_equivalente.ProdutoRF("Tesouro", tesouro / 100, prazo, isento=False))
     if debenture is not None:
-        # Entra pelo modelo canônico de título: a isenção da incentivada é
-        # derivada do tipo + categoria no modelo, não digitada à mão.
-        titulo_deb = Titulo(
-            nome="Debênture incentivada" if incentivada else "Debênture",
-            tipo="Debênture",
-            vencimento=date.today() + timedelta(days=prazo),
-            taxa_compra=Decimal(str(debenture / 100)),
-            data_referencia=date.today(),
-            emissor="não informado",
-            categoria="debênture-incentivada" if incentivada else "debênture-comum",
+        produtos.append(
+            taxa_equivalente.ProdutoRF(
+                nome="Debênture incentivada" if incentivada else "Debênture",
+                taxa_anual=debenture / 100,
+                prazo_dias=prazo,
+                categoria="debênture-incentivada" if incentivada else "debênture-comum",
+            )
         )
-        produtos.append(taxa_equivalente.ProdutoRF.de_titulo(titulo_deb, prazo_dias=prazo))
 
     # Guarda de magnitude (não-bloqueante): taxa < 1.0 sugere decimal
     # (0.12) digitado onde se espera percentual (12.0) — muda a magnitude
@@ -521,9 +464,7 @@ def fundos_resumo(
         raise typer.Exit(code=1)
 
     try:
-        acumulada = rentabilidade_periodo(df)
-        anualizada = rentabilidade_anualizada(df)
-        pct_cdi = percentual_cdi(df, provider_do_dado("cdi"))
+        resumo = taxa_equivalente.resumir_fundo(df, provider_do_dado("cdi"))
     except requests.RequestException as erro:
         _falha_de_rede("obter o CDI da série SGS/BCB", erro)
     except ValueError as erro:
@@ -534,9 +475,9 @@ def fundos_resumo(
     console.print(
         f"[bold]Fundo CNPJ:[/] {cnpj} — referência {referencia.month:02d}/{referencia.year}"
     )
-    console.print(f"[bold]Rentabilidade acumulada:[/] {acumulada:.4%}")
-    console.print(f"[bold]Rentabilidade anualizada:[/] {anualizada:.4%}")
-    console.print(f"[bold]% do CDI:[/] {pct_cdi:.2%}")
+    console.print(f"[bold]Rentabilidade acumulada:[/] {resumo.rentabilidade_acumulada:.4%}")
+    console.print(f"[bold]Rentabilidade anualizada:[/] {resumo.rentabilidade_anualizada:.4%}")
+    console.print(f"[bold]% do CDI:[/] {resumo.percentual_cdi:.2%}")
     console.print()
     console.print(
         "Material de caráter informativo: apresenta métricas calculadas do "

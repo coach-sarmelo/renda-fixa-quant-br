@@ -86,3 +86,36 @@ def test_alvos_externos_respondem_200(alvo: str) -> None:
     com retentativas diante de instabilidade transitória)."""
     resposta = get_resiliente(alvo, timeout=30)
     assert resposta.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "nome_nb",
+    ["02_precificacao_tesouro.ipynb", "03_comparacao_liquida_ir.ipynb"],
+)
+def test_notebooks_executam_offline_e_batem_com_outputs_gravados(nome_nb: str) -> None:
+    """Todas as células de código dos notebooks de vitrine executam sem rede
+    e sem exceção, produzindo exatamente o stdout gravado no arquivo."""
+    import contextlib
+    import io
+    import json
+
+    caminho_nb = README.parent / "notebooks" / nome_nb
+    assert caminho_nb.is_file(), f"Notebook não encontrado: {caminho_nb}"
+    nb = json.loads(caminho_nb.read_text(encoding="utf-8"))
+
+    ns: dict[str, object] = {}
+    for celula in nb.get("cells", []):
+        if celula.get("cell_type") != "code":
+            continue
+        codigo = "".join(celula.get("source", []))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            exec(codigo, ns)
+        saida_real = buf.getvalue()
+        outputs_gravados = celula.get("outputs", [])
+        saida_gravada = "".join(
+            "".join(out.get("text", []))
+            for out in outputs_gravados
+            if out.get("output_type") == "stream" and out.get("name") == "stdout"
+        )
+        assert saida_real == saida_gravada

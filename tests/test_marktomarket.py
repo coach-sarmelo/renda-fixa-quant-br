@@ -213,3 +213,60 @@ def test_curva_aplica_exata_a_cada_titulo_preservando_ordem_e_defaults() -> None
 def test_curva_com_lote_vazio_devolve_lista_vazia() -> None:
     """Lote vazio ⇒ lista vazia — sem exceção, sem marcação fantasma."""
     assert marktomarket.curva(date(2026, 6, 2), []) == []
+
+
+def test_exata_deriva_pu_compra_quando_omitido() -> None:
+    """Se `pu_compra` não for informado, `exata` o deriva automaticamente a partir de `taxa_compra`."""
+    res = marktomarket.exata(
+        data_compra=COMPRA,
+        data_hoje=HOJE,
+        data_vencimento=VENC,
+        taxa_compra=0.10,
+        taxa_mercado=0.12,
+        taxa_cupom_anual=0.06,
+    )
+    pu_compra_esperado = pu.calcular(
+        data_compra=COMPRA,
+        data_vencimento=VENC,
+        taxa_anual=0.10,
+        taxa_cupom_anual=0.06,
+    )
+    assert res.pu_compra == pytest.approx(pu_compra_esperado, rel=1e-12)
+
+
+def test_exata_e_curva_interpolam_taxa_mercado_via_ettj() -> None:
+    """`exata` e `curva` aceitam `ettj: ETTJ` para interpolar `taxa_mercado` pelo prazo útil remanescente."""
+    from rfquant.data.calendario import dias_uteis
+    from rfquant.pricing.curva_juros import ETTJ
+
+    curva_ettj = ETTJ([(1.0, 0.10), (2.0, 0.11), (5.0, 0.125)])
+    du_rem = dias_uteis(HOJE, VENC)
+    taxa_interp = curva_ettj.taxa(du_rem / 252.0)
+
+    res_ettj = marktomarket.exata(
+        data_compra=COMPRA,
+        data_hoje=HOJE,
+        data_vencimento=VENC,
+        taxa_compra=0.105,
+        ettj=curva_ettj,
+    )
+    res_direto = marktomarket.exata(
+        data_compra=COMPRA,
+        data_hoje=HOJE,
+        data_vencimento=VENC,
+        taxa_compra=0.105,
+        taxa_mercado=taxa_interp,
+    )
+    assert res_ettj == res_direto
+
+    lote = [{"data_compra": COMPRA, "data_vencimento": VENC, "taxa_compra": 0.105}]
+    res_lote = marktomarket.curva(HOJE, lote, ettj=curva_ettj)
+    assert res_lote == [res_direto]
+
+    with pytest.raises(ValueError, match=r"taxa_mercado|ETTJ"):
+        marktomarket.exata(
+            data_compra=COMPRA,
+            data_hoje=HOJE,
+            data_vencimento=VENC,
+            taxa_compra=0.105,
+        )

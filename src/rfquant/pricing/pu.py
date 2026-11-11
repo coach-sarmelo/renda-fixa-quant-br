@@ -1,15 +1,31 @@
-"""Cálculo do Preço Unitário (PU) de um título."""
+"""Cálculo do Preço Unitário (PU) e Avaliação de Título."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 from rfquant.data.calendario import dias_uteis as _dias_uteis_calendario
 from rfquant.data.calendario import proximo_dia_util as _proximo_dia_util_calendario
-from rfquant.pricing.fluxo_caixa import Fluxo, gerar_fluxos
+from rfquant.pricing import current_yield
+from rfquant.pricing.fluxo_caixa import Fluxo, cupom_periodo, gerar_fluxos
 
 # Número de dias úteis por ano (convenção do mercado brasileiro)
 DU_ANO = 252
+_BASE_COTACAO = 100.0
+
+
+@dataclass(frozen=True)
+class AvaliacaoTitulo:
+    """Retrato completo de preço e sensibilidade de um título numa Data-Base."""
+
+    pu: float
+    cotacao: float | None
+    duration_macaulay: float
+    duration_modificada: float
+    dv01: float
+    convexidade: float
+    current_yield: float
 
 
 def dias_uteis(inicio: date, fim: date) -> int:
@@ -50,6 +66,87 @@ def fluxos_liquidados(fluxos: list[Fluxo], data_ref: date) -> list[Fluxo]:
     return [f for f in fluxos if f.data > limite or f.data == vencimento]
 
 
+def precificar(
+    data_base: date,
+    data_vencimento: date,
+    taxa_anual: float,
+    valor_nominal: float = 1000.0,
+    taxa_cupom_anual: float = 0.0,
+    frequencia_cupom: int = 2,
+    *,
+    vna: float | None = None,
+) -> AvaliacaoTitulo:
+    """Avalia um título numa única passagem sobre seus fluxos liquidados.
+
+    Suporta tanto títulos nominais (`valor_nominal`) quanto títulos
+    indexados ao IPCA (`vna` informado, retornando `cotacao` em % do VNA
+    sobre a base 100 e escalando `pu` e `dv01` pelo `vna`).
+    """
+    if vna is not None and vna <= 0:
+        raise ValueError("VNA deve ser positivo.")
+    if taxa_anual <= -1:
+        raise ValueError("Taxa anual deve ser maior que -100%.")
+
+    base_fluxos = _BASE_COTACAO if vna is not None else valor_nominal
+    escala = (vna / _BASE_COTACAO) if vna is not None else 1.0
+
+    fluxos = fluxos_liquidados(
+        gerar_fluxos(
+            data_compra=data_base,
+            data_vencimento=data_vencimento,
+            valor_nominal=base_fluxos,
+            taxa_cupom_anual=taxa_cupom_anual,
+            frequencia_cupom=frequencia_cupom,
+        ),
+        data_base,
+    )
+
+    pu_base = 0.0
+    pu_chocado = 0.0
+    soma_d_mac = 0.0
+    soma_cvx = 0.0
+
+    for f in fluxos:
+        du = _dias_uteis_calendario(data_base, f.data)
+        t = du / DU_ANO
+        vp = f.valor / (1 + taxa_anual) ** t
+        vp_chocado = f.valor / (1 + taxa_anual + 0.0001) ** t
+        pu_base += vp
+        pu_chocado += vp_chocado
+        soma_d_mac += t * vp
+        soma_cvx += t * (t + 1) * vp
+
+    if pu_base <= 0:
+        raise ValueError("PU inválido para avaliação do título.")
+
+    d_mac = soma_d_mac / pu_base
+    d_mod = d_mac / (1 + taxa_anual)
+    cvx = soma_cvx / (pu_base * (1 + taxa_anual) ** 2)
+    cotacao = pu_base if vna is not None else None
+    pu_final = pu_base * escala
+    dv01_final = abs(pu_base - pu_chocado) * escala
+
+    if taxa_cupom_anual > 0:
+        cupom_anual = (
+            escala
+            * frequencia_cupom
+            * cupom_periodo(base_fluxos, taxa_cupom_anual, frequencia_cupom)
+        )
+        cy = current_yield.calcular(cupom_anual, pu_final)
+    else:
+        cy = 0.0
+
+    return AvaliacaoTitulo(
+        pu=pu_final,
+        cotacao=cotacao,
+        duration_macaulay=d_mac,
+        duration_modificada=d_mod,
+        dv01=dv01_final,
+        convexidade=cvx,
+        current_yield=cy,
+    )
+
+
 def calcular(
     data_compra: date,
     data_vencimento: date,
@@ -63,14 +160,14 @@ def calcular(
     Fórmula:
         PU = Σ FC_t / (1 + y)^(du_t / 252)
     """
-    fluxos: list[Fluxo] = gerar_fluxos(
-        data_compra=data_compra,
+    return precificar(
+        data_base=data_compra,
         data_vencimento=data_vencimento,
+        taxa_anual=taxa_anual,
         valor_nominal=valor_nominal,
         taxa_cupom_anual=taxa_cupom_anual,
         frequencia_cupom=frequencia_cupom,
-    )
-    return _pu_de_fluxos(fluxos_liquidados(fluxos, data_compra), data_compra, taxa_anual)
+    ).pu
 
 
 def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> float:
@@ -84,7 +181,7 @@ def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> flo
         raise ValueError("Taxa anual deve ser maior que -100%.")
     pu_total = 0.0
     for f in fluxos:
-        du = dias_uteis(data_ref, f.data)
+        du = _dias_uteis_calendario(data_ref, f.data)
         fator = (1 + taxa_anual) ** (du / DU_ANO)
         pu_total += f.valor / fator
     return pu_total

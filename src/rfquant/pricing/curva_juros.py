@@ -22,6 +22,8 @@ from typing import Literal
 import numpy as np
 from scipy.optimize import OptimizeWarning, curve_fit
 
+from rfquant.comparison.taxa_equivalente import ipca_mais_para_pre, pre_para_ipca_mais
+
 Metodo = Literal["linear", "flat_forward", "nelson_siegel"]
 
 
@@ -187,16 +189,12 @@ def taxa_nominal_para_efetiva(taxa_nominal: float, periodos: int = 2) -> float:
 def taxa_pre_para_pos(pre: float, ipca_esperado: float) -> float:
     """Converte taxa prefixada em taxa real (IPCA+) equivalente.
 
-    Relação de Fisher exata:
+    Relação de Fisher exata (delega à implementação canônica):
         (1 + pre) = (1 + real) × (1 + ipca)
     """
-    if ipca_esperado <= -1:
-        raise ValueError("IPCA esperado deve ser maior que -100%.")
-    return (1 + pre) / (1 + ipca_esperado) - 1
+    return pre_para_ipca_mais(pre, ipca_esperado)
 
 
 def taxa_pos_para_pre(real: float, ipca_esperado: float) -> float:
     """Converte taxa real (IPCA+) em prefixada equivalente."""
-    if ipca_esperado <= -1:
-        raise ValueError("IPCA esperado deve ser maior que -100%.")
-    return (1 + real) * (1 + ipca_esperado) - 1
+    return ipca_mais_para_pre(real, ipca_esperado)

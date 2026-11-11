@@ -1,19 +1,24 @@
-"""Conversão de taxas entre produtos de renda fixa.
+"""Conversão de taxas e análise comparativa entre produtos e fundos de renda fixa.
 
 Cobre:
     - CDB pré vs CDI (% do CDI)
     - Isento (LCI/LCA) vs tributado (CDB)
     - Prefixado vs IPCA+ (Fisher)
     - Taxa bruta vs taxa líquida de IR
+    - Resumo de rentabilidade de Informe Diário de fundos vs CDI
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal
+
+import pandas as pd
 
 from rfquant.comparison import ir
-from rfquant.data.base import Titulo
+from rfquant.data.base import Titulo, isento_por_categoria, validar_categoria
+from rfquant.data.calendario import dias_uteis as _dias_uteis_calendario
 from rfquant.data.sgs_bcb import SGSProvider
 
 DU_ANO = 252  # base de dias úteis do mercado brasileiro
@@ -72,6 +77,85 @@ def cdi_anual_do_provider(provider: SGSProvider, inicio: date, fim: date) -> flo
 
 
 # ----------------------------------------------------------------------
+# Resumo de Informe Diário de Fundos (CVM) vs CDI
+# ----------------------------------------------------------------------
+@dataclass(frozen=True)
+class ResumoFundo:
+    """Resumo integrado de rentabilidade de um fundo no período."""
+
+    rentabilidade_acumulada: float
+    rentabilidade_anualizada: float
+    percentual_cdi: float
+    data_inicio: date | None
+    data_fim: date | None
+    dias_uteis: int
+
+
+def rentabilidade_periodo(df_fundo: pd.DataFrame) -> float:
+    """Calcula a rentabilidade acumulada a partir da série de cota.
+
+    Assume que `df_fundo` está ordenado por data e contém a coluna `valor_cota`.
+    """
+    if df_fundo.empty or "valor_cota" not in df_fundo.columns:
+        return 0.0
+    cotas = df_fundo["valor_cota"].dropna()
+    if len(cotas) < 2 or cotas.iloc[0] == 0:
+        return 0.0
+    return float(cotas.iloc[-1] / cotas.iloc[0] - 1)
+
+
+def cdi_equivalente(rentabilidade: float, dias_uteis: int) -> float:
+    """Anualiza uma rentabilidade pelo número de dias úteis (base 252)."""
+    if dias_uteis <= 0:
+        return 0.0
+    return float((1 + rentabilidade) ** (DU_ANO / dias_uteis) - 1)
+
+
+def rentabilidade_anualizada(df_fundo: pd.DataFrame) -> float:
+    """Anualiza (base 252) a rentabilidade acumulada com DU do calendário real."""
+    acumulada = rentabilidade_periodo(df_fundo)
+    if df_fundo.empty or "data_competencia" not in df_fundo.columns:
+        return 0.0
+    datas = pd.to_datetime(df_fundo["data_competencia"])
+    du = _dias_uteis_calendario(datas.iloc[0].date(), datas.iloc[-1].date())
+    return cdi_equivalente(acumulada, du)
+
+
+def resumir_fundo(df_fundo: pd.DataFrame, cdi_provider: SGSProvider) -> ResumoFundo:
+    """Calcula acumulada, anualizada (base 252) e % CDI em uma única passagem."""
+    if (
+        df_fundo.empty
+        or "data_competencia" not in df_fundo.columns
+        or "valor_cota" not in df_fundo.columns
+    ):
+        return ResumoFundo(0.0, 0.0, 0.0, None, None, 0)
+
+    acumulada = rentabilidade_periodo(df_fundo)
+    datas = pd.to_datetime(df_fundo["data_competencia"])
+    inicio, fim = datas.iloc[0].date(), datas.iloc[-1].date()
+    du = _dias_uteis_calendario(inicio, fim)
+    if du <= 0:
+        return ResumoFundo(acumulada, 0.0, 0.0, inicio, fim, 0)
+
+    anualizada = cdi_equivalente(acumulada, du)
+    cdi_anual = cdi_anual_do_provider(cdi_provider, inicio, fim)
+    pct_cdi = taxa_anual_para_cdi(anualizada, cdi_anual)
+    return ResumoFundo(
+        rentabilidade_acumulada=acumulada,
+        rentabilidade_anualizada=anualizada,
+        percentual_cdi=pct_cdi,
+        data_inicio=inicio,
+        data_fim=fim,
+        dias_uteis=du,
+    )
+
+
+def percentual_cdi(df_fundo: pd.DataFrame, cdi_provider: SGSProvider) -> float:
+    """Expressa a rentabilidade anualizada do fundo em % do CDI."""
+    return resumir_fundo(df_fundo, cdi_provider).percentual_cdi
+
+
+# ----------------------------------------------------------------------
 # Isento vs tributado
 # ----------------------------------------------------------------------
 def isento_equivalente_a_tributado(
@@ -103,7 +187,7 @@ def tributado_equivalente_a_isento(
 
 
 # ----------------------------------------------------------------------
-# Prefixado vs IPCA+
+# Prefixado vs IPCA+ (Fisher canônica)
 # ----------------------------------------------------------------------
 def pre_para_ipca_mais(prefixado: float, ipca_esperado: float) -> float:
     """Taxa prefixada → taxa real (IPCA+) equivalente (Fisher exata)."""
@@ -124,13 +208,11 @@ def ipca_mais_para_pre(ipca_mais: float, ipca_esperado: float) -> float:
 # ----------------------------------------------------------------------
 @dataclass
 class ProdutoRF:
-    """View derivada de um produto para comparação.
+    """View de um produto para comparação líquida de IR.
 
-    Modelo canônico: `Titulo` (data/base.py), a dataclass do núcleo de
-    dados. Esta dataclass é a view mínima do núcleo de comparação; o único
-    ponto de conversão é `de_titulo()`. O núcleo segue recebendo a
-    dataclass pequena para preservar as assinaturas vigentes de
-    `taxa_liquida_anual`/`comparar`.
+    Pode ser construída a partir do `Titulo` canônico via `de_titulo()` ou
+    diretamente com `categoria` (validada contra `CATEGORIAS` e derivando
+    `isento` automaticamente para `LCI`, `LCA` e `debênture-incentivada`).
     """
 
     nome: str
@@ -139,6 +221,12 @@ class ProdutoRF:
     isento: bool = False
     liquidez_diaria: bool = False
     emissor: str = ""
+    categoria: str | None = None
+
+    def __post_init__(self) -> None:
+        validar_categoria(self.categoria)
+        if isento_por_categoria(self.categoria):
+            self.isento = True
 
     @classmethod
     def de_titulo(
@@ -170,6 +258,7 @@ class ProdutoRF:
             isento=titulo.isento_ir,
             liquidez_diaria=liquidez_diaria,
             emissor=titulo.emissor,
+            categoria=titulo.categoria,
         )
 
 
@@ -246,15 +335,21 @@ def taxa_liquida_anual_composta(produto: ProdutoRF) -> float:
     return liquida_composta(produto.taxa_anual, produto.prazo_dias, produto.isento, produto.nome)
 
 
-def comparar(produtos: list[ProdutoRF]) -> list[ResultadoComparacao]:
+def comparar(
+    produtos: list[ProdutoRF],
+    *,
+    convencao: Literal["linear", "composta"] = "linear",
+) -> list[ResultadoComparacao]:
     """Compara produtos por taxa líquida anual (decrescente).
 
     Default linear: o comparar e o CLI mantêm a convenção linear;
-    a variante composta é o default do ranking.
+    a variante composta é o default do ranking (e selecionável via convencao='composta').
     """
+    if convencao not in ("linear", "composta"):
+        raise ValueError(f"Convenção desconhecida: {convencao!r}. Use 'linear' ou 'composta'.")
     resultados: list[ResultadoComparacao] = []
     for p in produtos:
-        liq = taxa_liquida_anual(p)
+        liq = taxa_liquida_anual(p) if convencao == "linear" else taxa_liquida_anual_composta(p)
         eq_cdb = isento_equivalente_a_tributado(liq, p.prazo_dias) if p.isento else p.taxa_anual
         resultados.append(
             ResultadoComparacao(

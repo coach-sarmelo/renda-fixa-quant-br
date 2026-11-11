@@ -41,14 +41,11 @@ import pandas as pd
 import requests
 
 from rfquant.data import cache
-from rfquant.data.calendario import dias_uteis
+from rfquant.data.cache import USER_AGENT
 from rfquant.data.sgs_bcb import SGSProvider
 
 CVM_BASE_URL = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS"
 TTL_CVM = 86_400  # 24 h: o informe mensal troca 1×/dia útil e congela no fechamento
-USER_AGENT = (
-    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
-)
 TIMEOUT_CVM = 120  # payload ~11 MB/mês — 120 s folgam
 
 # Nomes amigáveis em português (layout vigente de classes/subclasses — RCVM 175)
@@ -136,43 +133,27 @@ class CVMFundosProvider:
         if not (1 <= mes <= 12):
             raise ValueError("Mês deve estar entre 1 e 12.")
 
-        # Frame mensal parseado é cacheado ALÉM do ZIP: em cache hit o
-        # read_csv do informe integral (~11 MB) não roda de novo. A chave
-        # deriva da URL do mês e o TTL é o mesmo do arquivo cru; com
-        # usar_cache=False a leitura é pulada e o frame regravado — o
-        # re-download traz dado fresco para os dois caches.
         url = self._url_mes(ano, mes)
-        chave_frame = f"{url}::df"
-        df_cache: pd.DataFrame | None = None
-        if usar_cache:
-            df_cache = cache.frame_do_cache(cache.get(chave_frame))
-        if df_cache is None:
+
+        def _construir() -> pd.DataFrame:
             zip_bytes = self._baixar_zip(ano, mes, usar_cache=usar_cache)
             csv_bytes = self._extrair_csv(zip_bytes)
-            df_cache = pd.read_csv(
+            df_mes = pd.read_csv(
                 io.BytesIO(csv_bytes),
                 sep=";",
                 encoding="latin-1",
                 dtype={"CNPJ_FUNDO_CLASSE": str},
             )
-            df_cache = df_cache.rename(columns=COLUNAS_PT)
-            if "data_competencia" in df_cache.columns:
-                df_cache["data_competencia"] = pd.to_datetime(df_cache["data_competencia"]).dt.date
-            # Contrato de série: ordenação garantida pelo provider, não
-            # herdada da ordem do arquivo da fonte — o frame entra no cache
-            # já ordenado.
-            df_cache = df_cache.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(
-                drop=True
-            )
-            # Payload portável (dict de arrays numpy) em vez do frame
-            # picklado: pickle de frame do pandas 3 referencia o pyarrow e
-            # não desserializa em ambiente sem o pacote.
-            cache.set(chave_frame, cache.frame_para_cache(df_cache), ttl=self.ttl)
-        df = df_cache
+            df_mes = df_mes.rename(columns=COLUNAS_PT)
+            if "data_competencia" in df_mes.columns:
+                df_mes["data_competencia"] = pd.to_datetime(df_mes["data_competencia"]).dt.date
+            return df_mes.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(drop=True)
+
+        df = cache.obter_ou_parsear_frame(
+            url, ttl=self.ttl, construtor=_construir, usar_cache=usar_cache
+        )
 
         if cnpj:
-            # Filtro vetorizado (operações str do pandas), igualdade
-            # normalizada por dígitos — sem lambda por linha.
             cnpj_alvo = _somente_digitos(cnpj)
             mascara = df["cnpj_fundo"].astype(str).str.replace(r"\D", "", regex=True) == cnpj_alvo
             df = df[mascara].reset_index(drop=True)
@@ -239,13 +220,7 @@ class CVMFundosProvider:
         return f"{CVM_BASE_URL}/inf_diario_fi_{ano}{mes:02d}.zip"
 
     def _baixar_zip(self, ano: int, mes: int, usar_cache: bool = True) -> bytes:
-        """Conteúdo cru do ZIP mensal: cache TTL → rede.
-
-        Cache com TTL explícito via ``rfquant.data.cache`` — substitui o antigo
-        cache de arquivo sem expiração (``~/.rfquant/cache/cvm``), que nunca
-        vencia. Com ``usar_cache=False`` a leitura do cache é pulada e o fetch
-        atualiza a entrada (re-download força dado fresco).
-        """
+        """Conteúdo cru do ZIP mensal: cache TTL → rede."""
         url = self._url_mes(ano, mes)
 
         if usar_cache:
@@ -261,8 +236,6 @@ class CVMFundosProvider:
             )
             resp.raise_for_status()
         except requests.RequestException as erro:
-            # HTTP 4xx é domínio (mês sem arquivo publicado); o resto é rede.
-            # O raise_for_status real do requests anexa a resposta ao HTTPError.
             status = getattr(getattr(erro, "response", None), "status_code", None)
             if isinstance(status, int) and 400 <= status < 500:
                 raise InformeNaoDisponivel(
@@ -285,81 +258,37 @@ class CVMFundosProvider:
             nomes = zf.namelist()
             if not nomes:
                 raise ValueError(f"ZIP vazio ({len(zip_bytes)} bytes recebidos).")
-            # Normalmente há um único CSV
             csv_name = next((n for n in nomes if n.lower().endswith(".csv")), nomes[0])
             with zf.open(csv_name) as f:
                 return f.read()
 
 
 # ----------------------------------------------------------------------
-# Utilitários de análise rápida de fundos
+# Delegadores de compatibilidade (a implementação vive em comparison)
 # ----------------------------------------------------------------------
 def rentabilidade_periodo(df_fundo: pd.DataFrame) -> float:
-    """Calcula a rentabilidade acumulada a partir da série de cota.
+    """Calcula a rentabilidade acumulada a partir da série de cota."""
+    from rfquant.comparison import taxa_equivalente
 
-    Assume que `df_fundo` está ordenado por data e contém a coluna `valor_cota`.
-    """
-    if df_fundo.empty or "valor_cota" not in df_fundo.columns:
-        return 0.0
-    cotas = df_fundo["valor_cota"].dropna()
-    if len(cotas) < 2 or cotas.iloc[0] == 0:
-        return 0.0
-    return float(cotas.iloc[-1] / cotas.iloc[0] - 1)
+    return taxa_equivalente.rentabilidade_periodo(df_fundo)
 
 
 def cdi_equivalente(rentabilidade: float, dias_uteis: int) -> float:
-    """Anualiza uma rentabilidade pelo número de dias úteis (base 252).
+    """Anualiza uma rentabilidade pelo número de dias úteis (base 252)."""
+    from rfquant.comparison import taxa_equivalente
 
-    Mantida por compatibilidade (snippet de ``docs/dados.md``): no resumo de
-    fundo o DU do período vem do calendário real — use
-    `rentabilidade_anualizada`, que deriva o DU da própria `data_competencia`.
-    """
-    if dias_uteis <= 0:
-        return 0.0
-    return float((1 + rentabilidade) ** (252 / dias_uteis) - 1)
+    return taxa_equivalente.cdi_equivalente(rentabilidade, dias_uteis)
 
 
 def rentabilidade_anualizada(df_fundo: pd.DataFrame) -> float:
-    """Anualiza (base 252) a rentabilidade acumulada com DU do calendário real.
+    """Anualiza (base 252) a rentabilidade acumulada com DU do calendário real."""
+    from rfquant.comparison import taxa_equivalente
 
-    O nº de dias úteis do período vem de
-    ``rfquant.data.calendario.dias_uteis`` (convenção ``(inicio, fim]``)
-    entre a primeira e a última `data_competencia` da série — no lugar do
-    parâmetro manual do `cdi_equivalente` acima, que só anualiza e não
-    recebe taxa CDI. Entrada degenerada (série curta, sem datas ou DU
-    0) devolve 0.0, no padrão de `rentabilidade_periodo`.
-    """
-    acumulada = rentabilidade_periodo(df_fundo)
-    if df_fundo.empty or "data_competencia" not in df_fundo.columns:
-        return 0.0
-    datas = pd.to_datetime(df_fundo["data_competencia"])
-    du = dias_uteis(datas.iloc[0].date(), datas.iloc[-1].date())
-    if du <= 0:
-        return 0.0
-    return float((1 + acumulada) ** (252 / du) - 1)
+    return taxa_equivalente.rentabilidade_anualizada(df_fundo)
 
 
 def percentual_cdi(df_fundo: pd.DataFrame, cdi_provider: SGSProvider) -> float:
-    """Expressa a rentabilidade anualizada do fundo em % do CDI.
+    """Expressa a rentabilidade anualizada do fundo em % do CDI."""
+    from rfquant.comparison import taxa_equivalente
 
-    Composição ``taxa_anual_para_cdi(anualizada, cdi_anual)``: o CDI anual
-    (decimal a.a.) é derivado do provider SGS/BCB (série 12, % ao dia) por
-    `cdi_anual_do_provider` na MESMA janela do fundo — primeira a última
-    `data_competencia`.
-    """
-    # Import tardio (no corpo): data/__init__ importa este módulo e
-    # comparison.taxa_equivalente importa rfquant.data.sgs_bcb — import de
-    # módulo aqui fecha o ciclo rfq -> comparison -> taxa_equivalente ->
-    # data -> cvm_fundos (ImportError de módulo parcialmente inicializado
-    # fora do pytest). No corpo, os módulos já estão todos carregados.
-    from rfquant.comparison.taxa_equivalente import (
-        cdi_anual_do_provider,
-        taxa_anual_para_cdi,
-    )
-
-    if df_fundo.empty or "data_competencia" not in df_fundo.columns:
-        return 0.0
-    datas = pd.to_datetime(df_fundo["data_competencia"])
-    inicio, fim = datas.iloc[0].date(), datas.iloc[-1].date()
-    cdi_anual = cdi_anual_do_provider(cdi_provider, inicio, fim)
-    return taxa_anual_para_cdi(rentabilidade_anualizada(df_fundo), cdi_anual)
+    return taxa_equivalente.percentual_cdi(df_fundo, cdi_provider)

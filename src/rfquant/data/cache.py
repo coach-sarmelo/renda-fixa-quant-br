@@ -1,9 +1,10 @@
-"""Cache simples de requisições HTTP usando diskcache."""
+"""Cache de requisições HTTP e DataFrames portáveis usando diskcache."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from typing import Any
 
 import diskcache as dc
@@ -11,6 +12,10 @@ import numpy as np
 import pandas as pd
 
 from rfquant.config import settings
+
+USER_AGENT = (
+    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
+)
 
 settings.ensure_dirs()
 _cache = dc.Cache(str(settings.cache_dir / "http"))
@@ -62,3 +67,23 @@ def frame_do_cache(payload: Any) -> pd.DataFrame | None:
     if not isinstance(payload, dict) or not all(isinstance(k, str) for k in payload):
         return None
     return pd.DataFrame(dict(payload))
+
+
+def obter_ou_parsear_frame(
+    url: str,
+    *,
+    ttl: int,
+    construtor: Callable[[], pd.DataFrame],
+    usar_cache: bool = True,
+) -> pd.DataFrame:
+    """Recupera o DataFrame parseado do cache (chave ``f'{url}::df'``) ou
+    executa ``construtor()`` e persiste no formato portável sem pyarrow.
+    """
+    chave_frame = f"{url}::df"
+    df_cache: pd.DataFrame | None = None
+    if usar_cache:
+        df_cache = frame_do_cache(get(chave_frame))
+    if df_cache is None:
+        df_cache = construtor()
+        set(chave_frame, frame_para_cache(df_cache), ttl=ttl)
+    return df_cache

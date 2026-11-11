@@ -126,3 +126,67 @@ def test_pu_na_vespera_do_vencimento_e_o_fluxo_final_descontado() -> None:
     compra, venc = date(2026, 12, 31), date(2027, 1, 4)  # próximo dia útil de 31/12
     esperado = 1000.0 / 1.10 ** (1 / 252)
     assert pu.calcular(compra, venc, 0.10) == pytest.approx(esperado, rel=1e-9)
+
+
+def test_precificar_nominal_retorna_avaliacao_completa_consistente() -> None:
+    """Seam 1: `rfquant.pricing.precificar` retorna `AvaliacaoTitulo` com PU,
+    durations, DV01, convexidade e current yield consistentes em 1 passagem."""
+    from rfquant.pricing import AvaliacaoTitulo, precificar
+
+    # Caso 1: zero-cupom de exatos 252 DU (t = 1,0 ano) a 10% a.a.
+    av_zero = precificar(
+        data_base=date(2026, 1, 5),
+        data_vencimento=date(2027, 1, 8),
+        taxa_anual=0.10,
+        valor_nominal=1000.0,
+        taxa_cupom_anual=0.0,
+    )
+    assert isinstance(av_zero, AvaliacaoTitulo)
+    assert av_zero.cotacao is None
+    assert av_zero.pu == pytest.approx(1000.0 / 1.10, rel=1e-12)
+    assert av_zero.duration_macaulay == pytest.approx(1.0, rel=1e-12)
+    assert av_zero.duration_modificada == pytest.approx(1.0 / 1.10, rel=1e-12)
+    assert av_zero.dv01 == pytest.approx(1000.0 / 1.10 - 1000.0 / 1.1001, rel=1e-12)
+    assert av_zero.convexidade == pytest.approx(2.0 / (1.10**2), rel=1e-12)
+    assert av_zero.current_yield == 0.0
+
+    # Caso 2: título com cupom semestral de 6% a.a. (README: 2026-10-01 -> 2035-05-15 a 6,2%)
+    av_cupom = precificar(
+        data_base=date(2026, 10, 1),
+        data_vencimento=date(2035, 5, 15),
+        taxa_anual=0.062,
+        valor_nominal=1000.0,
+        taxa_cupom_anual=0.06,
+    )
+    cupom_anual_esperado = 2 * 1000.0 * ((1.06**0.5) - 1.0)
+    assert av_cupom.cotacao is None
+    assert av_cupom.current_yield == pytest.approx(cupom_anual_esperado / av_cupom.pu, rel=1e-12)
+
+
+def test_precificar_modo_vna_ntnb_unifica_cotacao_pu_e_risco() -> None:
+    """Seam 1 (IPCA+/VNA): `precificar(..., vna=4500.0)` calcula cotação (% VNA),
+    PU em R$, DV01 escalado pelo VNA e Current Yield sobre o cupom composto."""
+    from rfquant.pricing import precificar
+
+    av_ntnb = precificar(
+        data_base=date(2026, 10, 1),
+        data_vencimento=date(2035, 5, 15),
+        taxa_anual=0.062,
+        taxa_cupom_anual=0.06,
+        vna=4500.0,
+    )
+    av_base100 = precificar(
+        data_base=date(2026, 10, 1),
+        data_vencimento=date(2035, 5, 15),
+        taxa_anual=0.062,
+        valor_nominal=100.0,
+        taxa_cupom_anual=0.06,
+    )
+    assert av_ntnb.cotacao is not None
+    assert av_ntnb.cotacao == pytest.approx(av_base100.pu, rel=1e-12)
+    assert av_ntnb.pu == pytest.approx(4500.0 * av_base100.pu / 100.0, rel=1e-12)
+    assert av_ntnb.duration_macaulay == pytest.approx(av_base100.duration_macaulay, rel=1e-12)
+    assert av_ntnb.duration_modificada == pytest.approx(av_base100.duration_modificada, rel=1e-12)
+    assert av_ntnb.convexidade == pytest.approx(av_base100.convexidade, rel=1e-12)
+    assert av_ntnb.dv01 == pytest.approx(av_base100.dv01 * 45.0, rel=1e-12)
+    assert av_ntnb.current_yield == pytest.approx(av_base100.current_yield, rel=1e-12)

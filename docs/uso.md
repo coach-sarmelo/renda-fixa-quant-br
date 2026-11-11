@@ -128,13 +128,15 @@ Opções:
 
 ```python
 from datetime import date
-from rfquant.pricing import pu
+from rfquant.pricing import precificar
 
-p = pu.calcular(
+av = precificar(
     data_compra=date(2024, 7, 15),   # data de referência que você quiser
     data_vencimento=date(2035, 5, 15),
     taxa_anual=0.062,
+    taxa_cupom_anual=0.06,
 )
+print(av.pu, av.duration_modificada, av.dv01)
 ```
 
 Saída (com `--vencimento 2035-05-15 --taxa 0.062 --cupom 0.06`, executado
@@ -307,14 +309,18 @@ rfq hoje
 
 ## Notebooks
 
-Dois notebooks prontos para explorar (`notebooks/`):
+Dois notebooks executados e verificados por regressão (`notebooks/`):
 
-- **`02_precificacao_tesouro.ipynb`** — PU, duration (Macaulay e
-  modificada), YTM, Current Yield e marcação a mercado de títulos do
-  Tesouro.
-- **`03_comparacao_liquida_ir.ipynb`** — comparação de CDB, LCI/LCA e
-  Tesouro Direto pela tabela regressiva de IR e a isenção de
-  LCI/LCA/CRI/CRA.
+- **`02_precificacao_tesouro.ipynb`** — Precificação consolidada via
+  `precificar` (nominal e NTN-B por `% do VNA`), duration de Macaulay e
+  modificada, DV01, convexidade, Current Yield na convenção composta
+  STN/ANBIMA, YTM e marcação a mercado exata (por taxa única e por curva
+  `ETTJ`).
+- **`03_comparacao_liquida_ir.ipynb`** — Tabela regressiva de IR + IOF,
+  inferência automática de isenção por categoria regulatória (`ProdutoRF(...,
+  categoria=...)`), comparação nas convenções linear e composta
+  (`comparar(..., convencao="composta")`) e paridade de Fisher exata
+  (`pre_para_ipca_mais`).
 
 ```bash
 jupyter lab notebooks/
@@ -329,33 +335,47 @@ nos docstrings dos módulos.
 
 ```python
 from datetime import date
-from rfquant.pricing import pu, duration, ytm, marktomarket
+from rfquant.pricing import precificar, ytm, marktomarket
+from rfquant.pricing.curva_juros import ETTJ
 
-# PU de um título com cupom semestral de 6% e yield 6,2% a.a.
-p = pu.calcular(
+# Precificação consolidada (PU, durations, DV01, convexidade e Current Yield)
+av = precificar(
     data_compra=date(2026, 1, 2),
     data_vencimento=date(2035, 5, 15),
     taxa_anual=0.062,
     taxa_cupom_anual=0.06,
 )
+print(av.pu, av.duration_macaulay, av.duration_modificada, av.dv01, av.convexidade, av.current_yield)
 
-d_mac = duration.macaulay(date(2026, 1, 2), date(2035, 5, 15), 0.062, taxa_cupom_anual=0.06)
-d_mod = duration.modificada(date(2026, 1, 2), date(2035, 5, 15), 0.062, taxa_cupom_anual=0.06)
+# Modo NTN-B (Tesouro IPCA+): cotação em % do VNA e PU = VNA × cotação/100
+av_ntnb = precificar(
+    data_compra=date(2026, 1, 2),
+    data_vencimento=date(2035, 5, 15),
+    taxa_anual=0.062,
+    taxa_cupom_anual=0.06,
+    vna=4500.0,
+)
+print(av_ntnb.cotacao_percentual_vna, av_ntnb.pu)
 
 # YTM dado um PU de mercado
-taxa = ytm.calcular(pu_mercado=1013.73, data_compra=date(2026, 1, 2),
-                    data_vencimento=date(2035, 5, 15), taxa_cupom_anual=0.06)
+taxa = ytm.calcular(
+    pu_mercado=980.0,
+    data_compra=date(2026, 1, 2),
+    data_vencimento=date(2035, 5, 15),
+    taxa_cupom_anual=0.06,
+)
 
-# Marcação a mercado exata (re-precificação pelo fluxo remanescente)
+# Marcação a mercado exata (por taxa única ou por curva ETTJ, sem precisar de pu_compra prévio)
+curva = ETTJ([(1.0, 0.058), (5.0, 0.061), (10.0, 0.064)], metodo="flat_forward")
 res = marktomarket.exata(
     data_compra=date(2025, 9, 1),
     data_hoje=date(2026, 9, 21),
     data_vencimento=date(2035, 5, 15),
-    pu_compra=980.0,
     taxa_compra=0.065,
-    taxa_mercado=0.062,
+    ettj=curva,
+    taxa_cupom_anual=0.06,
 )
-print(res.pu_mercado, res.variacao_percentual)
+print(res.pu_curva, res.pu_mercado, res.variacao_percentual)
 ```
 
 ### Curva de juros (ETTJ)
@@ -402,13 +422,18 @@ from rfquant.comparison import ir, taxa_equivalente
 res = ir.calcular(rendimento_bruto=1000.0, prazo_dias=720, isento=False)
 print(res.rendimento_liquido, res.aliquota_ir)
 
-# Comparação multi-produto (mesma lógica da CLI)
+# Comparação multi-produto com inferência automática de isenção por categoria
+# e escolha da convenção ("linear" ou "composta")
 produtos = [
-    taxa_equivalente.ProdutoRF("CDB", 0.12, 720, isento=False),
-    taxa_equivalente.ProdutoRF("LCI", 0.105, 720, isento=True),
+    taxa_equivalente.ProdutoRF("CDB", 0.12, 720, categoria="CDB"),
+    taxa_equivalente.ProdutoRF("LCI", 0.105, 720, categoria="LCI"),
+    taxa_equivalente.ProdutoRF("Deb. Incentivada", 0.11, 720, categoria="debênture-incentivada"),
 ]
-for r in taxa_equivalente.comparar(produtos):
-    print(f"{r.produto.nome}: líq {r.taxa_liquida_anual:.4%}")
+for r in taxa_equivalente.comparar(produtos, convencao="composta"):
+    print(f"{r.produto.nome}: líq {r.taxa_liquida_anual:.4%} (equiv. CDB {r.equivalente_cdb:.4%})")
+
+# Resumo de rentabilidade de fundo contra série CDI no período
+# resumo = taxa_equivalente.resumir_fundo(cotas_df, cdi_df)
 
 # Prefixado ↔ IPCA+ (Fisher exata)
 real = taxa_equivalente.pre_para_ipca_mais(0.12, 0.04)      # pré 12%, IPCA 4%

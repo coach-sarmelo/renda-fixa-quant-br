@@ -85,13 +85,17 @@ oficial; contexto em [dados.md](dados.md)).
 
 ```
 src/rfquant/
-├── data/            # Providers (Tesouro oficial) + cache em disco
-│   ├── base.py      #   Interface DataProvider + modelo Titulo
+├── data/            # Providers (Tesouro, SGS/BCB, CVM) + calendário + cache
+│   ├── base.py      #   Interface DataProvider + modelo Titulo + categorias
+│   ├── calendario.py       #   Calendário de dias úteis B3/SFN (base 252)
 │   ├── tesouro_oficial.py  #   CSV oficial do Tesouro Transparente
+│   ├── sgs_bcb.py          #   Série 12 do SGS/BCB (CDI diário)
+│   ├── cvm_fundos.py       #   Informes diários de fundos (CVM)
+│   ├── fontes.py           #   Mapa declarado de resolução automática de fontes
 │   ├── tesouro_direto.py   #   Provider brapi (não utilizável hoje)
-│   └── cache.py     #   Cache HTTP (diskcache)
-├── pricing/         # PU, duration, DV01, convexidade, YTM, current yield, marcação, curva
-├── comparison/      # IR regressivo, IOF, taxa equivalente
+│   └── cache.py            #   Cache HTTP (diskcache + obter_ou_parsear_frame)
+├── pricing/         # precificar (AvaliacaoTitulo), PU, NTN-B, duration, DV01, convexidade, YTM, current yield, marcação, curva (ETTJ)
+├── comparison/      # IR regressivo, IOF, taxa equivalente (ProdutoRF, comparar, resumir_fundo)
 ├── cli.py           # Interface de linha de comando (rfq)
 ├── relatorio.py     # Relatório determinístico (Markdown)
 └── config.py        # Settings (pydantic-settings, lê .env)
@@ -102,9 +106,9 @@ src/rfquant/
 **Precificação** (`rfq tesouro precificar ...`):
 
 1. O usuário invoca a CLI.
-2. A CLI chama `rfquant.pricing.pu.calcular(...)` — matemática pura, sem rede.
-3. O núcleo gera os fluxos de caixa e desconta pela taxa (base 252).
-4. O resultado é formatado e impresso via `rich`.
+2. A CLI chama `rfquant.pricing.precificar(...)` — matemática pura, sem rede.
+3. O núcleo gera os fluxos de caixa liquidados (`fluxos_liquidados`, janela D+1 útil) uma única vez e avalia PU, cotação em `% do VNA` (modo NTN-B), durations, DV01, convexidade e Current Yield sobre a mesma lista de fluxos (base 252).
+4. O resultado (`AvaliacaoTitulo`) é formatado e impresso via `rich`.
 
 **Listagem** (`rfq tesouro listar --fonte=oficial`):
 

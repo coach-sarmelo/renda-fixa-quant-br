@@ -34,13 +34,11 @@ import pandas as pd
 import requests
 
 from rfquant.data import cache
+from rfquant.data.cache import USER_AGENT
 
 SERIE_CDI = 12  # série 12 do SGS: CDI diário (% ao dia)
 URL_BASE = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados"
 TTL_SGS = 86_400  # 24 h: a série troca 1×/dia
-USER_AGENT = (
-    "rfquant/0.1.0 (renda-fixa-quant-br; +https://github.com/coach-sarmelo/renda-fixa-quant-br)"
-)
 TIMEOUT_SGS = 30  # payload é pequeno (KBs) — 30 s folgam
 
 
@@ -117,7 +115,6 @@ class SGSProvider:
     def _parsear(self, payload: Any, inicio: date, fim: date) -> pd.DataFrame:
         """JSON SGS → DataFrame (``data``: date; ``valor``: float, % ao dia)."""
         if isinstance(payload, dict):
-            # Forma de erro real do SGS (período sem dados / série inexistente).
             msg = (
                 f"SGS: sem dados para a série {self.serie} no período "
                 f"{inicio:%d/%m/%Y} a {fim:%d/%m/%Y} (o BCB respondeu: {payload})."

@@ -195,13 +195,20 @@ atual.
 
 Re-precifica o fluxo remanescente na data de hoje, duas vezes:
 
-- `pu_curva`: fluxo remanescente descontado pela **taxa de compra** (o
-  "carrego" do título, não um resultado de mercado);
-- `pu_mercado`: o mesmo fluxo descontado pela **taxa de mercado** atual.
+- `pu_curva`: fluxo remanescente em `data_hoje` descontado pela **taxa de
+  compra** `taxa_compra` (o preço teórico na curva de aquisição — o
+  "carrego" do título em `data_hoje`, distinto do preço pago em
+  `data_compra`);
+- `pu_mercado`: o mesmo fluxo descontado pela **taxa de mercado** atual
+  (`taxa_mercado`) ou pela taxa interpolada de uma curva `ETTJ` (`ettj`) no
+  prazo remanescente em anos úteis (`du / 252`).
 
 A variação é `pu_mercado − pu_curva` (absoluta e percentual), com a
-duration modificada e os dias úteis decorridos no resultado. A função
-`marktomarket.curva` aplica o mesmo cálculo a uma lista de títulos.
+duration modificada e os dias úteis decorridos no resultado; `pu_compra` é
+opcional (calculado automaticamente na `data_compra` quando omitido). A
+função `marktomarket.curva` aplica o mesmo cálculo a uma lista de títulos
+(aceitando `ettj` compartilhada por toda a carteira ou `taxa_mercado` por
+item).
 
 ## 10. Tabela Regressiva de IR
 

@@ -313,3 +313,111 @@ def test_composto_taxa_menos_um_perda_total_e_float() -> None:
     comp = taxa_equivalente.taxa_liquida_anual_composta(p)
     assert isinstance(comp, float)
     assert comp < 0
+
+
+# ----------------------------------------------------------------------
+# Seam 2: resumir_fundo (análise unificada do Informe Diário + % CDI)
+# ----------------------------------------------------------------------
+def test_resumir_fundo_calcula_acumulada_anualizada_e_pct_cdi_em_uma_passagem() -> None:
+    """Seam 2: `resumir_fundo` calcula rentabilidade acumulada, anualizada (base 252
+    com DU reais) e % do CDI sobre a mesma janela `(inicio, fim]`."""
+    df_fundo = pd.DataFrame(
+        {
+            "data_competencia": [date(2026, 9, 1), date(2026, 9, 8)],
+            "valor_cota": [1.0, 1.002],
+        }
+    )
+    # Entre 01/09/2026 (terça) e 08/09/2026 (terça), com feriado de 07/09 (segunda),
+    # há exatamente 4 dias úteis reais: 02, 03, 04 e 08/09.
+    provider = _ProviderSGSMockado(valor_dia=0.05, n_du=4)
+    resumo = taxa_equivalente.resumir_fundo(df_fundo, provider)
+
+    acumulada_esp = 0.002
+    anualizada_esp = (1.0 + acumulada_esp) ** (252 / 4) - 1.0
+    cdi_anual_esp = (1.0005**252) - 1.0
+
+    assert isinstance(resumo, taxa_equivalente.ResumoFundo)
+    assert resumo.data_inicio == date(2026, 9, 1)
+    assert resumo.data_fim == date(2026, 9, 8)
+    assert resumo.dias_uteis == 4
+    assert resumo.rentabilidade_acumulada == pytest.approx(acumulada_esp, rel=1e-12)
+    assert resumo.rentabilidade_anualizada == pytest.approx(anualizada_esp, rel=1e-12)
+    assert resumo.percentual_cdi == pytest.approx(anualizada_esp / cdi_anual_esp, rel=1e-12)
+
+
+def test_resumir_fundo_entradas_degeneradas_retornam_zeros() -> None:
+    """Seam 2: DataFrames vazios, sem colunas ou com 0 DU retornam ResumoFundo zerado."""
+    provider = _ProviderSGSMockado(valor_dia=0.05, n_du=4)
+    vazio = taxa_equivalente.resumir_fundo(pd.DataFrame(), provider)
+    assert vazio.rentabilidade_acumulada == 0.0
+    assert vazio.rentabilidade_anualizada == 0.0
+    assert vazio.percentual_cdi == 0.0
+    assert vazio.dias_uteis == 0
+
+    df_mesmo_dia = pd.DataFrame(
+        {
+            "data_competencia": [date(2026, 9, 1), date(2026, 9, 1)],
+            "valor_cota": [1.0, 1.001],
+        }
+    )
+    mesmo_dia = taxa_equivalente.resumir_fundo(df_mesmo_dia, provider)
+    assert mesmo_dia.dias_uteis == 0
+    assert mesmo_dia.rentabilidade_anualizada == 0.0
+    assert mesmo_dia.percentual_cdi == 0.0
+
+
+def test_guardas_validacao_taxa_equivalente() -> None:
+    """Guardas de validação de entradas inválidas em taxa_equivalente."""
+    with pytest.raises(ValueError, match="positivo"):
+        taxa_equivalente.cdi_para_taxa_anual(0.0, 0.13)
+    with pytest.raises(ValueError, match="positivo"):
+        taxa_equivalente.cdi_para_taxa_anual(1.10, 0.0)
+    with pytest.raises(ValueError, match="positivo"):
+        taxa_equivalente.taxa_anual_para_cdi(0.13, 0.0)
+    with pytest.raises(ValueError, match="-100%"):
+        taxa_equivalente.pre_para_ipca_mais(0.12, -1.0)
+    with pytest.raises(ValueError, match="-100%"):
+        taxa_equivalente.ipca_mais_para_pre(0.06, -1.0)
+
+
+# ----------------------------------------------------------------------
+# Seam 4: ProdutoRF(..., categoria=...) e comparar(..., convencao=...)
+# ----------------------------------------------------------------------
+def test_produto_rf_deriva_isento_por_categoria_e_valida_lista_fechada() -> None:
+    """Seam 4: `ProdutoRF` deriva `isento` automaticamente de `categoria`
+    (`LCI`, `LCA`, `debênture-incentivada`) e rejeita categorias desconhecidas."""
+    cdb = taxa_equivalente.ProdutoRF("CDB", 0.12, 720, categoria="CDB")
+    lci = taxa_equivalente.ProdutoRF("LCI", 0.10, 720, categoria="LCI")
+    lca = taxa_equivalente.ProdutoRF("LCA", 0.10, 720, categoria="LCA")
+    deb_comum = taxa_equivalente.ProdutoRF("Deb", 0.13, 720, categoria="debênture-comum")
+    deb_inc = taxa_equivalente.ProdutoRF("Deb Inc", 0.11, 720, categoria="debênture-incentivada")
+
+    assert cdb.isento is False
+    assert lci.isento is True
+    assert lca.isento is True
+    assert deb_comum.isento is False
+    assert deb_inc.isento is True
+
+    with pytest.raises(ValueError, match="Categoria desconhecida"):
+        taxa_equivalente.ProdutoRF("Invalido", 0.12, 720, categoria="CRA-inexistente")
+
+
+def test_comparar_suporta_convencao_linear_e_composta() -> None:
+    """Seam 4 (ADR-0003): `comparar` aceita `convencao='linear'` (default) e
+    `convencao='composta'`, ordenando pela taxa líquida da convenção escolhida."""
+    cdb = taxa_equivalente.ProdutoRF("CDB 12% 2a", 0.12, 730, categoria="CDB")
+    lci = taxa_equivalente.ProdutoRF("LCI 10.24% 2a", 0.1024, 730, categoria="LCI")
+
+    # Em 730d (IR 15%), CDB 12% tem:
+    # - líquido linear = 12% * 0.85 = 10.20% (< LCI 10.24%)
+    # - líquido composto = sqrt(1 + 0.85*(1.12^2 - 1)) - 1 ≈ 10.2833% (> LCI 10.24%)
+    res_lin = taxa_equivalente.comparar([cdb, lci], convencao="linear")
+    res_comp = taxa_equivalente.comparar([cdb, lci], convencao="composta")
+
+    assert res_lin[0].produto.nome == "LCI 10.24% 2a"
+    assert res_comp[0].produto.nome == "CDB 12% 2a"
+    assert res_comp[0].taxa_liquida_anual == pytest.approx(
+        taxa_equivalente.taxa_liquida_anual_composta(cdb), rel=1e-12
+    )
+    with pytest.raises(ValueError, match="Convenção desconhecida"):
+        taxa_equivalente.comparar([cdb], convencao="invalida")  # type: ignore[arg-type]
