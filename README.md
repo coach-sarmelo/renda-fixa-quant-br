@@ -144,7 +144,7 @@ for r in taxa_equivalente.comparar(produtos, convencao="composta"):
 ```
 
 Mais exemplos (YTM, NTN-B com VNA, ETTJ Nelson-Siegel, IR/IOF, fundos CVM vs. CDI) em
-[Uso detalhado](docs/uso.md), e os notebooks em [`notebooks/`](notebooks/).
+[Uso detalhado](docs/uso.md), e os três notebooks executados (`02_precificacao_tesouro.ipynb`, `03_comparacao_liquida_ir.ipynb` e `04_curva_ettj_e_risco.ipynb`) em [`notebooks/`](notebooks/).
 
 
 ## Arquitetura

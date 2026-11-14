@@ -309,7 +309,7 @@ rfq hoje
 
 ## Notebooks
 
-Dois notebooks executados e verificados por regressão (`notebooks/`):
+Três notebooks executados e verificados por regressão (`notebooks/`):
 
 - **`02_precificacao_tesouro.ipynb`** — Precificação consolidada via
   `precificar` (nominal e NTN-B por `% do VNA`), duration de Macaulay e
@@ -321,6 +321,12 @@ Dois notebooks executados e verificados por regressão (`notebooks/`):
   categoria=...)`), comparação nas convenções linear e composta
   (`comparar(..., convencao="composta")`) e paridade de Fisher exata
   (`pre_para_ipca_mais`).
+- **`04_curva_ettj_e_risco.ipynb`** — Construção da ETTJ Prefixada e IPCA+
+  sobre vértices reais do Tesouro Direto (`flat-forward` vs. `nelson-siegel`),
+  estrutura a termo da inflação implícita (Breakeven IPCA via Fisher),
+  decomposição semanal entre carrego (`pu_curva`) e marcação a mercado
+  (`marktomarket.curva(..., ettj=...)`) confrontada com o `PU Compra Manhã`
+  oficial e aproximação de Taylor de 1ª vs. 2ª ordem (`Duration + Convexidade`).
 
 ```bash
 jupyter lab notebooks/

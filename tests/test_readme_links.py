@@ -90,7 +90,11 @@ def test_alvos_externos_respondem_200(alvo: str) -> None:
 
 @pytest.mark.parametrize(
     "nome_nb",
-    ["02_precificacao_tesouro.ipynb", "03_comparacao_liquida_ir.ipynb"],
+    [
+        "02_precificacao_tesouro.ipynb",
+        "03_comparacao_liquida_ir.ipynb",
+        "04_curva_ettj_e_risco.ipynb",
+    ],
 )
 def test_notebooks_executam_offline_e_batem_com_outputs_gravados(nome_nb: str) -> None:
     """Todas as células de código dos notebooks de vitrine executam sem rede
