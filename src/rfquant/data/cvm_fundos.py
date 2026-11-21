@@ -147,6 +147,9 @@ class CVMFundosProvider:
             df_mes = df_mes.rename(columns=COLUNAS_PT)
             if "data_competencia" in df_mes.columns:
                 df_mes["data_competencia"] = pd.to_datetime(df_mes["data_competencia"]).dt.date
+            # Contrato de série: ordenação garantida pelo provider, não
+            # herdada da ordem do arquivo da fonte — o frame entra no cache
+            # já ordenado.
             return df_mes.sort_values(["cnpj_fundo", "data_competencia"]).reset_index(drop=True)
 
         df = cache.obter_ou_parsear_frame(
@@ -154,6 +157,8 @@ class CVMFundosProvider:
         )
 
         if cnpj:
+            # Filtro vetorizado (operações str do pandas), igualdade
+            # normalizada por dígitos — sem lambda por linha.
             cnpj_alvo = _somente_digitos(cnpj)
             mascara = df["cnpj_fundo"].astype(str).str.replace(r"\D", "", regex=True) == cnpj_alvo
             df = df[mascara].reset_index(drop=True)
@@ -220,7 +225,13 @@ class CVMFundosProvider:
         return f"{CVM_BASE_URL}/inf_diario_fi_{ano}{mes:02d}.zip"
 
     def _baixar_zip(self, ano: int, mes: int, usar_cache: bool = True) -> bytes:
-        """Conteúdo cru do ZIP mensal: cache TTL → rede."""
+        """Conteúdo cru do ZIP mensal: cache TTL → rede.
+
+        Cache com TTL explícito via ``rfquant.data.cache`` — substitui o antigo
+        cache de arquivo sem expiração (``~/.rfquant/cache/cvm``), que nunca
+        vencia. Com ``usar_cache=False`` a leitura do cache é pulada e o fetch
+        atualiza a entrada (re-download força dado fresco).
+        """
         url = self._url_mes(ano, mes)
 
         if usar_cache:
@@ -236,6 +247,8 @@ class CVMFundosProvider:
             )
             resp.raise_for_status()
         except requests.RequestException as erro:
+            # HTTP 4xx é domínio (mês sem arquivo publicado); o resto é rede.
+            # O raise_for_status real do requests anexa a resposta ao HTTPError.
             status = getattr(getattr(erro, "response", None), "status_code", None)
             if isinstance(status, int) and 400 <= status < 500:
                 raise InformeNaoDisponivel(
@@ -258,6 +271,7 @@ class CVMFundosProvider:
             nomes = zf.namelist()
             if not nomes:
                 raise ValueError(f"ZIP vazio ({len(zip_bytes)} bytes recebidos).")
+            # Normalmente há um único CSV
             csv_name = next((n for n in nomes if n.lower().endswith(".csv")), nomes[0])
             with zf.open(csv_name) as f:
                 return f.read()

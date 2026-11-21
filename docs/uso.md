@@ -124,14 +124,14 @@ Opções:
 > genérico), mas vive sob `tesouro` por ser o caso de uso principal. A data
 > de referência é sempre **a data atual** e não há opção `--data`: para
 > precificar em uma data histórica ou futura, use a biblioteca, que aceita
-> `data_compra` explícita:
+> `data_base` explícita:
 
 ```python
 from datetime import date
 from rfquant.pricing import precificar
 
 av = precificar(
-    data_compra=date(2024, 7, 15),   # data de referência que você quiser
+    data_base=date(2024, 7, 15),   # data-base de referência que você quiser
     data_vencimento=date(2035, 5, 15),
     taxa_anual=0.062,
     taxa_cupom_anual=0.06,
@@ -346,7 +346,7 @@ from rfquant.pricing.curva_juros import ETTJ
 
 # Precificação consolidada (PU, durations, DV01, convexidade e Current Yield)
 av = precificar(
-    data_compra=date(2026, 1, 2),
+    data_base=date(2026, 1, 2),
     data_vencimento=date(2035, 5, 15),
     taxa_anual=0.062,
     taxa_cupom_anual=0.06,
@@ -355,13 +355,13 @@ print(av.pu, av.duration_macaulay, av.duration_modificada, av.dv01, av.convexida
 
 # Modo NTN-B (Tesouro IPCA+): cotação em % do VNA e PU = VNA × cotação/100
 av_ntnb = precificar(
-    data_compra=date(2026, 1, 2),
+    data_base=date(2026, 1, 2),
     data_vencimento=date(2035, 5, 15),
     taxa_anual=0.062,
     taxa_cupom_anual=0.06,
     vna=4500.0,
 )
-print(av_ntnb.cotacao_percentual_vna, av_ntnb.pu)
+print(av_ntnb.cotacao, av_ntnb.pu)
 
 # YTM dado um PU de mercado
 taxa = ytm.calcular(

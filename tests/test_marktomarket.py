@@ -270,3 +270,12 @@ def test_exata_e_curva_interpolam_taxa_mercado_via_ettj() -> None:
             data_vencimento=VENC,
             taxa_compra=0.105,
         )
+    with pytest.raises(ValueError, match="apenas uma"):
+        marktomarket.exata(
+            data_compra=COMPRA,
+            data_hoje=HOJE,
+            data_vencimento=VENC,
+            taxa_compra=0.105,
+            taxa_mercado=0.11,
+            ettj=curva_ettj,
+        )

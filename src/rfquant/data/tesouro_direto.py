@@ -64,6 +64,8 @@ class TesouroDiretoProvider(DataProvider):
         )
         resp.raise_for_status()
         payload = resp.json()
+        # A fonte responde tanto com {"indicators": [...]} quanto com a
+        # lista pura — um corpo sem indicadores vira histórico vazio.
         rows = payload if isinstance(payload, list) else payload.get("indicators", [])
         cache.set(url, rows, params, ttl=3600)
         return pd.DataFrame(rows)
@@ -86,6 +88,9 @@ class TesouroDiretoProvider(DataProvider):
         )
         resp.raise_for_status()
         payload = resp.json()
+        # Mesmo contrato do histórico: a fonte responde tanto com
+        # {"treasury": [...]} quanto com a lista pura — o isinstance vem
+        # primeiro, senão payload.get estoura AttributeError na lista.
         rows: list[dict] = payload if isinstance(payload, list) else payload.get("treasury", [])
         cache.set(url, rows, params, ttl=900)
         return rows

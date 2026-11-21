@@ -170,7 +170,7 @@ def calcular(
     ).pu
 
 
-def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> float:
+def pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> float:
     """Desconta os fluxos a ``taxa_anual`` — validação central de taxa.
 
     Raises:
@@ -185,3 +185,6 @@ def _pu_de_fluxos(fluxos: list[Fluxo], data_ref: date, taxa_anual: float) -> flo
         fator = (1 + taxa_anual) ** (du / DU_ANO)
         pu_total += f.valor / fator
     return pu_total
+
+
+_pu_de_fluxos = pu_de_fluxos

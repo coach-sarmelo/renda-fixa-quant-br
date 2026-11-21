@@ -110,6 +110,8 @@ def exata(
     if data_hoje >= data_vencimento:
         raise ValueError("Título já vencido ou vencendo hoje.")
 
+    if taxa_mercado is not None and ettj is not None:
+        raise ValueError("Informe apenas uma entre 'taxa_mercado' e 'ettj', não ambas.")
     if taxa_mercado is None:
         if ettj is None:
             raise ValueError("Informe `taxa_mercado` ou uma instância de `ettj` (ETTJ).")

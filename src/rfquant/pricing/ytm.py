@@ -7,7 +7,7 @@ from datetime import date
 from scipy.optimize import brentq
 
 from rfquant.pricing.fluxo_caixa import gerar_fluxos
-from rfquant.pricing.pu import _pu_de_fluxos, fluxos_liquidados
+from rfquant.pricing.pu import fluxos_liquidados, pu_de_fluxos
 
 
 def calcular(
@@ -38,7 +38,7 @@ def calcular(
     fluxos = fluxos_liquidados(fluxos, data_compra)
 
     def f(y: float) -> float:
-        return _pu_de_fluxos(fluxos, data_compra, y) - pu_mercado
+        return pu_de_fluxos(fluxos, data_compra, y) - pu_mercado
 
     # Expande o bracket até conter a raiz (PU com ágio profundo → YTM < -5%;
     # PU com deságio extremo → YTM > 50%).
