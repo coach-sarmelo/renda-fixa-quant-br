@@ -5,21 +5,7 @@ Como o `rfquant` está organizado por dentro. Para a matemática, veja
 
 ## Visão geral
 
-```
-Fonte oficial (Tesouro Transparente/CKAN — CSV público, sem token)
-│
-▼
-Camada de dados e cache (providers + diskcache, download ≤ 1×/24 h)
-│
-▼
-Núcleo quant (PU, duration, DV01, convexidade, YTM, current yield, marcação a mercado, ETTJ)
-│
-▼
-Comparação (IR regressivo, IOF, taxa equivalente)
-│
-▼
-Interfaces (CLI `rfq`, notebooks, biblioteca Python)
-```
+![Arquitetura determinística do rfquant](arquitetura-diagrama.svg)
 
 **Status das fontes:** três fontes oficiais em produção, cada uma dona de
 um tipo de dado no mapa declarado (`src/rfquant/data/fontes.py`): títulos do

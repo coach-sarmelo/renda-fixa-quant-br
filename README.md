@@ -149,6 +149,8 @@ Mais exemplos (YTM, NTN-B com VNA, ETTJ Nelson-Siegel, IR/IOF, fundos CVM vs. CD
 
 ## Arquitetura
 
+![Arquitetura determinística do rfquant](docs/arquitetura-diagrama.svg)
+
 ```
 src/rfquant/
 ├── data/            # Providers oficiais (Tesouro, SGS/BCB, CVM), calendário B3/SFN e cache em disco
